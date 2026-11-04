@@ -1,0 +1,22 @@
+{
+  "name": "nds",
+  "version": "1.0.0",
+  "description": "NDS — Dashboard, Pricelist, Products, Setup and Users (copied from nepaldairy)",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "canvas": "^3.2.3",
+    "connect-pg-simple": "^10.0.0",
+    "dotenv": "^17.4.0",
+    "ejs": "^5.0.1",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "pg": "^8.13.3"
+  }
+}

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Users - <%= companyName %></title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .pw-row td { background: #f5f6ff; padding: 10px 14px; }
+    .pw-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pw-form input { padding: 7px 10px; border: 1px solid #c5cae9; border-radius: 6px; font-size: 13px; width: 200px; }
+    .pw-form input:focus { outline: none; border-color: #3f51b5; }
+    .pw-label { font-size: 13px; color: #555; font-weight: 600; }
+    .btn-pw { background: #3f51b5; color: #fff; border: none; padding: 7px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .btn-pw:hover { background: #303f9f; }
+    .btn-pw-toggle { background: none; border: 1px solid #9fa8da; color: #3f51b5; padding: 4px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+    .btn-pw-toggle:hover { background: #e8eaf6; }
+    .action-cell { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+  <main class="main-content">
+    <div class="page-header"><h2>👥 User Management</h2></div>
+
+    <% if (typeof success !== 'undefined' && success) { %>
+      <div class="alert alert-success"><%= success %></div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <!-- Add New User -->
+    <div class="card">
+      <h3>Add New User</h3>
+      <form method="POST" action="/admin/users/add" class="form-grid">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" name="username" required placeholder="Enter username">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" name="password" required placeholder="Enter password">
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select name="role" required>
+            <option value="Administrator">Administrator</option>
+            <option value="Lab">Lab</option>
+            <option value="Sales">Sales</option>
+            <option value="Print">Print</option>
+          </select>
+        </div>
+        <div class="form-full">
+          <button type="submit" class="btn-primary">Add User</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- User List -->
+    <div class="card">
+      <h3>System Users</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>#</th><th>Username</th><th>Role</th><th>Created</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <% users.forEach((u, i) => { %>
+            <tr>
+              <td><%= i+1 %></td>
+              <td><strong><%= u.username %></strong> <% if (u.id === user.id) { %><span class="text-muted">(you)</span><% } %></td>
+              <td><span class="role-badge role-<%= u.role.toLowerCase() %>"><%= u.role %></span></td>
+              <td><%= u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : '-' %></td>
+              <td>
+                <div class="action-cell">
+                  <button class="btn-pw-toggle" onclick="togglePw(<%= u.id %>)"><%= u.id === user.id ? '🔑 Change Password' : '🔑 Reset Password' %></button>
+                  <% if (u.id !== user.id) { %>
+                  <form method="POST" action="/admin/users/delete/<%= u.id %>" onsubmit="return confirm('Delete user <%= u.username %>?')">
+                    <button class="btn-danger-sm">Delete</button>
+                  </form>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+            <!-- Inline password change row -->
+            <tr class="pw-row" id="pw-<%= u.id %>" style="display:none">
+              <td colspan="5">
+                <form method="POST" action="/admin/users/change-password/<%= u.id %>" class="pw-form">
+                  <span class="pw-label">New password for <em><%= u.username %></em>:</span>
+                  <input type="password" name="new_password" placeholder="New password" minlength="4" required>
+                  <button type="submit" class="btn-pw">Set Password</button>
+                  <button type="button" class="btn-pw-toggle" onclick="togglePw(<%= u.id %>)">Cancel</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  <script src="/nepali-calendar.js"></script>
+  <script>
+    function togglePw(id) {
+      const row = document.getElementById('pw-' + id);
+      const visible = row.style.display !== 'none';
+      // Close all open pw rows first
+      document.querySelectorAll('.pw-row').forEach(r => r.style.display = 'none');
+      if (!visible) {
+        row.style.display = '';
+        row.querySelector('input[type=password]').focus();
+      }
+    }
+    // Auto-open pw row if there was an error (so user sees feedback)
+  </script>
+</body>
+</html>

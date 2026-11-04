@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipe Detail - <%= companyName %></title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .summary-table th {
+      background: #f5f5f5;
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 12px;
+      color: #555;
+      font-weight: 600;
+      border-bottom: 2px solid #e0e0e0;
+      white-space: normal;
+      vertical-align: bottom;
+    }
+    .summary-table th.num { text-align: right; }
+    .summary-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    .summary-table td.num { text-align: right; }
+    .summary-table tr.product-row:hover td { background: #fafafa; }
+    .summary-table tr:last-child td { border-bottom: none; }
+    .cat-header td {
+      background: #e3f2fd;
+      font-weight: 700;
+      color: #1565c0;
+      font-size: 12px;
+      padding: 5px 12px;
+      border-bottom: 1px solid #bbdefb;
+    }
+    .positive { color: #2e7d32; font-weight: 600; }
+    .negative { color: #c62828; font-weight: 600; }
+    .missing-note { color: #e65100; font-size: 11px; }
+    .no-price { color: #bdbdbd; }
+    .product-row { cursor: pointer; }
+    .toggle-icon { display: inline-block; width: 14px; color: #1976d2; font-size: 11px; }
+    .ing-count { font-size: 11px; color: #90a4ae; margin-left: 4px; }
+    .filter-bar { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; padding: 10px 14px 10px; border-bottom: 1px solid #f0f0f0; background: #fafafa; }
+    .filter-bar .fg { display: flex; flex-direction: column; gap: 3px; }
+    .filter-bar label { font-size: 11px; color: #757575; font-weight: 600; }
+    .filter-bar select, .filter-bar input[type=text] { padding: 5px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; min-width: 140px; }
+    .filter-bar select:focus, .filter-bar input:focus { outline: none; border-color: #1976d2; }
+    .btn-filter-clear { padding: 5px 12px; font-size: 12px; background: #f5f5f5; color: #555; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; align-self: flex-end; }
+    .btn-filter-clear:hover { background: #e0e0e0; }
+    .detail-row td { background: #fbfdff; padding: 0; }
+    .ing-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 6px 0 10px; }
+    .ing-table th { text-align: left; padding: 5px 10px; color: #757575; font-weight: 600; border-bottom: 1px solid #e0e0e0; }
+    .ing-table th.num { text-align: right; }
+    .ing-table td { padding: 4px 10px; border-bottom: 1px solid #f5f5f5; }
+    .ing-table td.num { text-align: right; }
+    .ing-table tr.sub-recipe-row td { background: #f3f8ff; }
+    .sub-badge { display: inline-block; background: #1565c0; color: #fff; font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
+    .ing-empty { padding: 10px 24px; color: #9e9e9e; font-style: italic; font-size: 12px; }
+    .ing-wrap { padding: 4px 24px 14px 24px; }
+    @media print {
+      @page { size: A4 landscape; margin: 8mm; }
+      .no-print { display: none !important; }
+      nav, .navbar, header { display: none !important; }
+      .main-content { margin: 0; padding: 0; }
+      .card { box-shadow: none; border: none; }
+      .summary-table { font-size: 10px; }
+      .summary-table th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 4px 6px; font-size: 10px; }
+      .summary-table td { padding: 4px 6px; font-size: 10px; }
+      .cat-header td { background: #cce5ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 3px 6px; }
+      .detail-row { display: table-row !important; }
+    }
+  </style>
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+  <main class="main-content">
+    <div class="page-header">
+      <h2>🧾 Recipe Detail</h2>
+      <div style="display:flex;gap:8px;" class="no-print">
+        <a href="/admin/recipes" class="btn-primary" style="text-decoration:none;padding:6px 14px;font-size:14px;">Recipes</a>
+        <a href="/admin/recipe-summary" style="text-decoration:none;padding:6px 14px;font-size:14px;background:#e3f2fd;color:#1565c0;border-radius:4px;">Recipe Summary</a>
+        <button onclick="expandAll()" style="padding:6px 14px;font-size:14px;background:#e8f5e9;color:#388e3c;border:1px solid #a5d6a7;border-radius:4px;cursor:pointer;">Expand All</button>
+        <button onclick="collapseAll()" style="padding:6px 14px;font-size:14px;background:#f5f5f5;color:#555;border:1px solid #ccc;border-radius:4px;cursor:pointer;">Collapse All</button>
+        <a href="/admin/recipe-detail/export" style="text-decoration:none;padding:6px 14px;font-size:14px;background:#fff3e0;color:#e65100;border:1px solid #ffcc80;border-radius:4px;">Export Spreadsheet</a>
+        <button onclick="window.print()" style="padding:6px 14px;font-size:14px;background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8;border-radius:4px;cursor:pointer;">Print</button>
+      </div>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+      <% if (rows.length > 0) { %>
+      <div class="filter-bar no-print">
+        <div class="fg">
+          <label>Category</label>
+          <select id="f_category" onchange="filterCategoryChange()">
+            <option value="">All Categories</option>
+            <% const fCats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort(); %>
+            <% fCats.forEach(c => { %><option value="<%= c %>"><%= c %></option><% }) %>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Sub-category</label>
+          <select id="f_subcategory" onchange="applyFilter()">
+            <option value="">All Sub-categories</option>
+            <% const fSubs = [...new Set(rows.map(r => r.subcategory).filter(Boolean))].sort(); %>
+            <% fSubs.forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Product</label>
+          <input type="text" id="f_product" placeholder="Search product name…" oninput="applyFilter()">
+        </div>
+        <button class="btn-filter-clear" onclick="clearFilters()">Clear Filters</button>
+      </div>
+      <% } %>
+      <% if (rows.length === 0) { %>
+        <p style="padding:20px;color:#9e9e9e;font-style:italic;">No recipes found. Save a batch size and add ingredients to a product first.</p>
+      <% } else {
+           // Group ingredients / sub-recipes by product_id
+           const ingByProduct = {};
+           ingredients.forEach(i => {
+             const pid = i.product_id;
+             if (!ingByProduct[pid]) ingByProduct[pid] = [];
+             ingByProduct[pid].push(i);
+           });
+           const subsByProduct = {};
+           subRecipes.forEach(s => {
+             const pid = s.product_id;
+             if (!subsByProduct[pid]) subsByProduct[pid] = [];
+             subsByProduct[pid].push(s);
+           });
+
+           // Group rows by category for sub-headers
+           const grouped = {};
+           rows.forEach(r => {
+             const cat = r.category || '(No Category)';
+             if (!grouped[cat]) grouped[cat] = [];
+             grouped[cat].push(r);
+           });
+
+           let anyMissing = false;
+           rows.forEach(r => {
+             if (parseInt(r.missing_prices) > 0) anyMissing = true;
+           });
+      %>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Product</th>
+            <th class="num">QTY/<br>Pack</th>
+            <th>Category</th>
+            <th>Sub-<br>category</th>
+            <th class="num">Batch<br>Qty</th>
+            <th>Batch<br>Unit</th>
+            <th class="num">Output Qty<br>(pcs)</th>
+            <th class="num">Loss<br>%</th>
+            <th class="num">Return<br>%</th>
+            <th class="num">Sellable<br>(pcs)</th>
+            <th class="num">Total Cost<br>(Rs.)</th>
+            <th class="num">Total Income<br>(Rs.)</th>
+            <th class="num">Total Margin<br>(Rs.)</th>
+            <th class="num">Margin<br>%</th>
+            <th class="num">Margin/pc<br>(Rs.)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% Object.keys(grouped).sort().forEach(cat => { %>
+          <tr class="cat-header" data-cat-header="<%= cat %>">
+            <td colspan="16"><%= cat %></td>
+          </tr>
+          <% grouped[cat].forEach(r => {
+               const rawCost        = r.total_cost != null ? parseFloat(r.total_cost) : null;
+               const wholesale      = r.wholesale  != null ? parseFloat(r.wholesale)  : null;
+               const discount       = r.discount   != null ? parseFloat(r.discount)   : 0;
+               const overheadPct    = r.overhead_pct != null ? parseFloat(r.overhead_pct) : 0;
+               const productionLoss = r.production_loss_pct != null ? parseFloat(r.production_loss_pct) : 0;
+               const damagePct      = r.damage_pct != null ? parseFloat(r.damage_pct) : 0;
+               const outputQty      = r.batch_output_qty != null ? parseFloat(r.batch_output_qty) : null;
+               const sellableQty    = outputQty != null ? outputQty * (1 - damagePct / 100) : null;
+               const effWS          = wholesale != null ? wholesale / (1 + discount / 100) : null;
+               const lossCost       = rawCost != null ? rawCost * (1 + productionLoss / 100) : null;
+               const totalCost      = lossCost != null ? lossCost * (1 + overheadPct / 100) : null;
+               const totalIncome    = effWS != null && sellableQty != null ? effWS * sellableQty : null;
+               const totalMargin    = totalIncome != null && totalCost != null && !parseInt(r.missing_prices) ? totalIncome - totalCost : null;
+               const marginPct      = totalMargin != null && totalIncome > 0 ? (totalMargin / totalIncome) * 100 : null;
+               const marginPc       = totalMargin != null && sellableQty > 0 ? totalMargin / sellableQty : null;
+               const hasMissing     = parseInt(r.missing_prices) > 0;
+               const rowIngredients = ingByProduct[r.product_id] || [];
+               const rowSubs        = subsByProduct[r.product_id] || [];
+               const detailId       = 'detail-' + r.product_id;
+          %>
+          <tr class="product-row"
+              data-category="<%= r.category || '' %>"
+              data-subcategory="<%= r.subcategory || '' %>"
+              data-name="<%= r.name.toLowerCase() %>"
+              data-target="<%= detailId %>"
+              onclick="toggleDetail(event, '<%= detailId %>')">
+            <td><span class="toggle-icon" id="icon-<%= detailId %>">▸</span></td>
+            <td>
+              <span class="product-link"><%= r.name %></span>
+              <span class="ing-count">(<%= rowIngredients.length %> raw material<%= rowIngredients.length === 1 ? '' : 's' %><%= rowSubs.length ? ', ' + rowSubs.length + ' sub-recipe' + (rowSubs.length === 1 ? '' : 's') : '' %>)</span>
+            </td>
+            <td class="num"><%= r.qty_pack != null ? r.qty_pack : '—' %></td>
+            <td><%= r.category || '—' %></td>
+            <td><%= r.subcategory || '—' %></td>
+            <td class="num"><%= r.base_quantity != null ? r.base_quantity : '—' %></td>
+            <td><%= r.base_unit || '—' %></td>
+            <td class="num"><%= outputQty != null ? outputQty : '—' %></td>
+            <td class="num"><%= productionLoss > 0 ? productionLoss + '%' : '—' %></td>
+            <td class="num"><%= damagePct > 0 ? damagePct + '%' : '—' %></td>
+            <td class="num"><%= sellableQty != null && damagePct > 0 ? sellableQty.toFixed(1) : (outputQty != null ? outputQty : '—') %></td>
+            <td class="num">
+              <% if (totalCost != null) { %>
+                <%= totalCost.toFixed(2) %>
+                <% if (hasMissing) { %><span class="missing-note"> *</span><% } %>
+              <% } else { %>—<% } %>
+            </td>
+            <td class="num">
+              <% if (totalIncome != null) { %><span style="color:#1976d2;"><%= totalIncome.toFixed(2) %></span><% } else { %>—<% } %>
+            </td>
+            <td class="num">
+              <% if (totalMargin != null) { %>
+                <span class="<%= totalMargin >= 0 ? 'positive' : 'negative' %>"><%= totalMargin.toFixed(2) %></span>
+              <% } else { %>—<% } %>
+            </td>
+            <td class="num">
+              <% if (marginPct != null) { %>
+                <span class="<%= marginPct >= 0 ? 'positive' : 'negative' %>"><%= marginPct.toFixed(1) %>%</span>
+              <% } else { %>—<% } %>
+            </td>
+            <td class="num">
+              <% if (marginPc != null) { %>
+                <span class="<%= marginPc >= 0 ? 'positive' : 'negative' %>"><%= marginPc.toFixed(2) %></span>
+              <% } else { %>—<% } %>
+            </td>
+          </tr>
+          <tr class="detail-row" id="<%= detailId %>" data-category="<%= r.category || '' %>" data-subcategory="<%= r.subcategory || '' %>" style="display:none;">
+            <td colspan="16">
+              <div class="ing-wrap">
+                <% if (rowIngredients.length === 0 && rowSubs.length === 0) { %>
+                  <div class="ing-empty">No ingredients recorded for this product yet.</div>
+                <% } else { %>
+                <table class="ing-table">
+                  <thead>
+                    <tr>
+                      <th>Ingredient</th>
+                      <th class="num">Qty</th>
+                      <th>Unit</th>
+                      <th class="num">Price/Unit (Rs.)</th>
+                      <th class="num">Cost (Rs.)</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% rowIngredients.forEach(item => {
+                         const itemCost = item.rm_price != null ? item.quantity * item.rm_price : null;
+                    %>
+                    <tr>
+                      <td><%= item.raw_material_name || '(deleted raw material)' %></td>
+                      <td class="num"><%= item.quantity %></td>
+                      <td><%= item.unit || item.rm_unit || '—' %></td>
+                      <td class="num"><% if (item.rm_price != null) { %><%= item.rm_price %><% } else { %><span class="no-price">—</span><% } %></td>
+                      <td class="num"><% if (itemCost != null) { %><%= itemCost.toFixed(2) %><% } else { %><span class="no-price">—</span><% } %></td>
+                      <td><%= item.notes || '' %></td>
+                    </tr>
+                    <% }) %>
+                    <% rowSubs.forEach(sub => {
+                         const subOutputQty = sub.sub_output_qty ? parseFloat(sub.sub_output_qty) : 0;
+                         const subTotalCost = parseFloat(sub.sub_total_cost) || 0;
+                         const subIngCount  = parseInt(sub.sub_ingredient_count) || 0;
+                         const subMissing   = parseInt(sub.sub_missing_price_count) || 0;
+                         const subCostPerUnit = (subIngCount > 0 && subOutputQty > 0 && subMissing === 0) ? subTotalCost / subOutputQty : null;
+                         const subItemCost = subCostPerUnit != null ? subCostPerUnit * sub.quantity : null;
+                         const subLabel = [sub.sub_product_category, sub.sub_product_subcategory].filter(Boolean).join(' › ');
+                    %>
+                    <tr class="sub-recipe-row">
+                      <td>
+                        <%= sub.sub_product_name %>
+                        <% if (subLabel) { %><span style="font-size:11px;color:#90a4ae;margin-left:4px;">(<%= subLabel %>)</span><% } %>
+                        <span class="sub-badge">SUB-RECIPE</span>
+                      </td>
+                      <td class="num"><%= sub.quantity %></td>
+                      <td><%= sub.unit || '—' %></td>
+                      <td class="num">
+                        <% if (subCostPerUnit != null) { %><%= subCostPerUnit.toFixed(4) %><% } else { %>
+                          <span class="no-price" style="font-size:11px;"><% if (subIngCount === 0) { %>no recipe<% } else if (subOutputQty === 0) { %>no batch size<% } else { %>prices missing<% } %></span>
+                        <% } %>
+                      </td>
+                      <td class="num"><% if (subItemCost != null) { %><%= subItemCost.toFixed(2) %><% } else { %><span class="no-price">—</span><% } %></td>
+                      <td>—</td>
+                    </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+          <% }) %>
+          <% }) %>
+        </tbody>
+      </table>
+      <% if (anyMissing) { %>
+        <p style="padding:8px 14px;font-size:12px;color:#e65100;margin:0;">* Some ingredient prices are missing — Total Cost and Margin for those rows may be understated.</p>
+      <% } %>
+      <div id="paginationBar" class="no-print" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid #f0f0f0;font-size:13px;color:#555;"></div>
+      <% } %>
+    </div>
+  </main>
+  <script>
+    const ROWS_DATA = <%- JSON.stringify(rows.map(r => ({ category: r.category || '', subcategory: r.subcategory || '' }))) %>;
+
+    const PAGE_SIZE = 25;
+    let currentPage = 1;
+
+    function toggleDetail(evt, id) {
+      const row = document.getElementById(id);
+      const icon = document.getElementById('icon-' + id);
+      if (!row) return;
+      const open = row.style.display !== 'none';
+      row.style.display = open ? 'none' : 'table-row';
+      if (icon) icon.textContent = open ? '▸' : '▾';
+    }
+
+    function expandAll() {
+      document.querySelectorAll('.detail-row').forEach(row => {
+        if (row.style.display === 'none' && row.parentElement) {
+          const productRow = document.querySelector(`.product-row[data-target="${row.id}"]`);
+          if (productRow && productRow.style.display === 'none') return; // skip filtered-out rows
+          row.style.display = 'table-row';
+          const icon = document.getElementById('icon-' + row.id);
+          if (icon) icon.textContent = '▾';
+        }
+      });
+    }
+
+    function collapseAll() {
+      document.querySelectorAll('.detail-row').forEach(row => {
+        row.style.display = 'none';
+        const icon = document.getElementById('icon-' + row.id);
+        if (icon) icon.textContent = '▸';
+      });
+    }
+
+    function filterCategoryChange() {
+      const cat = document.getElementById('f_category').value;
+      const subSel = document.getElementById('f_subcategory');
+      const subs = [...new Set(
+        ROWS_DATA.filter(r => !cat || r.category === cat).map(r => r.subcategory).filter(Boolean)
+      )].sort();
+      subSel.innerHTML = '<option value="">All Sub-categories</option>' +
+        subs.map(s => `<option value="${s}">${s}</option>`).join('');
+      applyFilter();
+    }
+
+    function applyFilter(resetPage = true) {
+      const cat  = document.getElementById('f_category').value;
+      const sub  = document.getElementById('f_subcategory').value;
+      const name = document.getElementById('f_product').value.toLowerCase().trim();
+      if (resetPage) currentPage = 1;
+
+      const allRows = Array.from(document.querySelectorAll('.product-row'));
+      const matched = allRows.filter(row =>
+        (!cat  || row.dataset.category    === cat) &&
+        (!sub  || row.dataset.subcategory === sub) &&
+        (!name || row.dataset.name.includes(name))
+      );
+
+      const totalPages = Math.max(1, Math.ceil(matched.length / PAGE_SIZE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const visible = new Set(matched.slice(start, start + PAGE_SIZE));
+
+      allRows.forEach(row => {
+        const show = visible.has(row);
+        row.style.display = show ? '' : 'none';
+        const detail = document.getElementById(row.dataset.target);
+        if (detail && !show) {
+          detail.style.display = 'none';
+          const icon = document.getElementById('icon-' + detail.id);
+          if (icon) icon.textContent = '▸';
+        }
+      });
+      document.querySelectorAll('.cat-header').forEach(catRow => {
+        const catName = catRow.dataset.catHeader;
+        const anyVisible = [...document.querySelectorAll(`.product-row[data-category="${catName}"]`)]
+          .some(r => visible.has(r));
+        catRow.style.display = anyVisible ? '' : 'none';
+      });
+
+      renderPagination(matched.length, totalPages);
+    }
+
+    function renderPagination(totalMatched, totalPages) {
+      const bar = document.getElementById('paginationBar');
+      if (!bar) return;
+      if (totalMatched === 0) { bar.innerHTML = '<span>No matching rows</span>'; return; }
+      const start = (currentPage - 1) * PAGE_SIZE + 1;
+      const end = Math.min(currentPage * PAGE_SIZE, totalMatched);
+      let html = `<span>Showing ${start}–${end} of ${totalMatched}</span>`;
+      if (totalPages > 1) {
+        html += '<div style="display:flex;gap:6px;align-items:center;">';
+        html += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})" class="btn-filter-clear">&laquo; Prev</button>`;
+        html += `<span>Page ${currentPage} of ${totalPages}</span>`;
+        html += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})" class="btn-filter-clear">Next &raquo;</button>`;
+        html += '</div>';
+      }
+      bar.innerHTML = html;
+    }
+
+    function goToPage(n) {
+      currentPage = n;
+      applyFilter(false);
+    }
+
+    function clearFilters() {
+      document.getElementById('f_category').value = '';
+      filterCategoryChange();
+      document.getElementById('f_product').value = '';
+      applyFilter();
+    }
+
+    if (document.getElementById('f_category')) {
+      applyFilter();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipes - <%= companyName %></title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .recipe-group { margin-bottom: 24px; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; }
+    .recipe-group-header {
+      background: #f5f5f5;
+      padding: 10px 16px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .recipe-group-header .top-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .recipe-group-header .product-title { font-weight: 600; font-size: 15px; }
+    .recipe-group-header .product-category { font-size: 12px; color: #757575; margin-left: 6px; }
+
+    .base-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .base-row label { font-size: 12px; color: #555; white-space: nowrap; }
+    .base-row input[type=number] { width: 80px; padding: 4px 6px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; }
+    .base-row select { padding: 4px 6px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; }
+    .base-row button { padding: 4px 10px; font-size: 12px; background: #1976d2; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+
+    .scale-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; background: #e3f2fd; padding: 6px 10px; border-radius: 4px; }
+    .scale-row label { font-size: 12px; color: #1565c0; white-space: nowrap; font-weight: 600; }
+    .scale-row input[type=number] { width: 80px; padding: 4px 6px; font-size: 13px; border: 1px solid #90caf9; border-radius: 4px; }
+    .scale-row .scale-result { font-size: 12px; color: #1565c0; }
+
+    .recipe-table { width: 100%; border-collapse: collapse; }
+    .recipe-table th { background: #fafafa; padding: 7px 12px; text-align: left; font-size: 12px; color: #757575; font-weight: 600; border-bottom: 1px solid #e0e0e0; }
+    .recipe-table td { padding: 7px 12px; font-size: 13px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+    .recipe-table tr:last-child td { border-bottom: none; }
+    .recipe-table td.num { text-align: right; }
+    .recipe-table th.num { text-align: right; }
+    .scaled-qty { color: #1976d2; font-weight: 600; }
+    .scaled-cost { color: #1976d2; font-weight: 600; }
+    .no-price { color: #bbb; font-size: 12px; }
+
+    .recipe-totals { display: flex; gap: 24px; flex-wrap: wrap; padding: 8px 14px; background: #f9fbe7; border-top: 2px solid #c5e1a5; font-size: 13px; }
+    .recipe-totals .tot-label { color: #757575; }
+    .recipe-totals .tot-value { font-weight: 700; color: #33691e; }
+    .recipe-totals .tot-scaled { color: #1976d2; font-weight: 700; }
+
+    .btn-edit { padding: 3px 9px; font-size: 12px; background: #f5f5f5; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; }
+    .btn-edit:hover { background: #e0e0e0; }
+    .btn-save { padding: 3px 9px; font-size: 12px; background: #4caf50; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-cancel { padding: 3px 9px; font-size: 12px; background: #f5f5f5; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; }
+    .recipe-empty { padding: 10px 16px; color: #9e9e9e; font-size: 13px; font-style: italic; }
+  </style>
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+  <main class="main-content">
+    <div class="page-header">
+      <h2>📋 Product Recipes</h2>
+      <div style="display:flex;gap:8px;">
+        <a href="/admin/recipe-summary" class="btn-primary" style="text-decoration:none;padding:6px 14px;font-size:14px;">Recipe Summary</a>
+        <a href="/admin/rawmaterials" style="text-decoration:none;padding:6px 14px;font-size:14px;background:#e8f5e9;color:#388e3c;border-radius:4px;">Raw Materials</a>
+        <a href="/admin/products" style="text-decoration:none;padding:6px 14px;font-size:14px;background:#f5f5f5;color:#555;border-radius:4px;">Products</a>
+      </div>
+    </div>
+
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <!-- Step 1: Set Product Batch Size -->
+    <div class="card">
+      <h3>1. Set Product Batch Size <span style="font-size:13px;font-weight:400;color:#757575;">— how much product does this recipe make?</span></h3>
+      <% if (products.length === 0) { %>
+        <p style="color:#e53935;font-size:14px;">Add <a href="/admin/products">products</a> first.</p>
+      <% } else { %>
+
+      <%# Embed product data for JS cascading %>
+      <script>
+        const ALL_PRODUCTS = <%- JSON.stringify(products.map(p => ({
+          id:          p.id,
+          name:        p.name,
+          category:    p.category    || '',
+          subcategory: p.subcategory || '',
+          unit:        p.unit        || '',
+          qty:         p.qty         || '',
+          wholesale:   p.wholesale   != null ? p.wholesale : '',
+          mrp:         p.mrp         != null ? p.mrp        : '',
+          batchLabel:  (() => {
+            const h = headers.find(h => h.product_id == p.id);
+            if (!h) return '';
+            let label = h.base_quantity + ' ' + (h.base_unit || '');
+            if (h.batch_output_qty != null) label += ' → ' + h.batch_output_qty + ' pcs';
+            return label;
+          })(),
+          batchQty:    (() => { const h = headers.find(h => h.product_id == p.id); return h ? h.base_quantity : ''; })(),
+          batchUnit:   (() => { const h = headers.find(h => h.product_id == p.id); return h ? (h.base_unit || '') : ''; })(),
+          batchOutput: (() => { const h = headers.find(h => h.product_id == p.id); return h && h.batch_output_qty != null ? h.batch_output_qty : ''; })(),
+          discount:        (() => { const h = headers.find(h => h.product_id == p.id); return h && h.discount != null ? h.discount : ''; })(),
+          overhead:        (() => { const h = headers.find(h => h.product_id == p.id); return h && h.overhead_pct != null ? h.overhead_pct : ''; })(),
+          productionLoss:  (() => { const h = headers.find(h => h.product_id == p.id); return h && h.production_loss_pct != null ? h.production_loss_pct : ''; })(),
+          damagePct:       (() => { const h = headers.find(h => h.product_id == p.id); return h && h.damage_pct != null ? h.damage_pct : ''; })()
+        }))) %>;
+      </script>
+
+      <form method="POST" action="/admin/recipes/set-base" class="form-grid" id="batchForm">
+        <!-- Row 1: Category › Sub-category › Product -->
+        <div class="form-group">
+          <label>Category</label>
+          <select id="bs_category" onchange="bsCategoryChange()">
+            <option value="">-- All Categories --</option>
+            <% const bsCats = [...new Set(products.map(p => p.category).filter(Boolean))].sort(); %>
+            <% bsCats.forEach(c => { %>
+              <option value="<%= c %>"><%= c %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Sub-category</label>
+          <select id="bs_subcategory" onchange="bsSubcategoryChange()">
+            <option value="">-- All Sub-categories --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Product <span style="color:red">*</span></label>
+          <select id="bs_product_display" onchange="bsProductChange()" required>
+            <option value="">-- Select Product --</option>
+          </select>
+          <input type="hidden" name="product_id" id="bs_product_id">
+        </div>
+
+        <!-- Row 2: Auto-filled product details (read-only) -->
+        <div class="form-group">
+          <label>Unit</label>
+          <input type="text" id="bs_unit_display" readonly placeholder="—" style="background:#f5f5f5;color:#555;">
+        </div>
+        <div class="form-group">
+          <label>QTY / Pack</label>
+          <input type="text" id="bs_qty_display" readonly placeholder="—" style="background:#f5f5f5;color:#555;">
+        </div>
+        <div class="form-group">
+          <label>Wholesale (Rs.)</label>
+          <input type="text" id="bs_ws_display" readonly placeholder="—" style="background:#f5f5f5;color:#555;">
+        </div>
+        <div class="form-group">
+          <label>MRP (Rs.)</label>
+          <input type="text" id="bs_mrp_display" readonly placeholder="—" style="background:#f5f5f5;color:#555;">
+        </div>
+        <div class="form-group">
+          <label>Discount on Wholesale (%)</label>
+          <input type="number" name="discount" id="bs_discount" step="0.01" min="0" max="100" placeholder="0" oninput="updateEffWs()">
+        </div>
+        <div class="form-group">
+          <label>Overhead Exp (%)</label>
+          <input type="number" name="overhead_pct" id="bs_overhead" step="0.01" min="0" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>Production Loss (%)</label>
+          <input type="number" name="production_loss_pct" id="bs_production_loss" step="0.01" min="0" max="100" placeholder="0" title="% of raw materials lost during production">
+        </div>
+        <div class="form-group">
+          <label>Return (%)</label>
+          <input type="number" name="damage_pct" id="bs_damage_pct" step="0.01" min="0" max="100" placeholder="0" title="% of finished product damaged / unsellable">
+        </div>
+        <div class="form-group">
+          <label>Eff. Wholesale (Rs.)</label>
+          <input type="text" id="bs_eff_ws_display" readonly placeholder="—" style="background:#f5f5f5;color:#1565c0;font-weight:600;">
+        </div>
+
+        <!-- Row 3: Batch inputs -->
+        <div class="form-group">
+          <label>Batch Quantity <span style="color:red">*</span></label>
+          <input type="number" name="base_quantity" id="bs_batch_qty" step="0.01" min="0.01" required placeholder="e.g. 100">
+        </div>
+        <div class="form-group">
+          <label>Batch Unit <span style="color:red">*</span></label>
+          <select name="base_unit" id="bs_batch_unit" required>
+            <option value="">-- Select --</option>
+            <% units.forEach(u => { %>
+              <%
+                const selHdrUnit = headers.find(h => h.product_id == selectedProductId);
+              %>
+              <option value="<%= u.name %>" <%= selHdrUnit && selHdrUnit.base_unit === u.name ? 'selected' : '' %>><%= u.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Batch Output Qty <span style="color:red">*</span></label>
+          <%
+            const selHdrOut = headers.find(h => h.product_id == selectedProductId);
+          %>
+          <input type="number" name="batch_output_qty" id="bs_batch_output" step="0.01" min="0.01" required
+                 value="<%= selHdrOut && selHdrOut.batch_output_qty != null ? selHdrOut.batch_output_qty : '' %>"
+                 placeholder="e.g. 200 (packs produced)">
+        </div>
+
+        <div class="form-full">
+          <button type="submit" class="btn-primary" onclick="return validateBatchForm()">Save Batch Size</button>
+        </div>
+      </form>
+      <% } %>
+    </div>
+
+    <!-- Step 2: Add Ingredient -->
+    <div class="card">
+      <h3>2. Add Ingredient to Recipe</h3>
+      <% if (!selectedProductId) { %>
+        <p style="color:#888;font-size:14px;">Select a product in Step 1 and save its batch size — then add ingredients here.</p>
+      <% } else {
+           const selProduct2 = products.find(p => p.id == selectedProductId);
+           const selHeader2  = headers.find(h => h.product_id == selectedProductId);
+      %>
+      <% if (!selProduct2) { %>
+        <p style="color:#e53935;">Selected product not found.</p>
+      <% } else if (materials.length === 0) { %>
+        <p style="color:#e53935;font-size:14px;">Add <a href="/admin/rawmaterials">raw materials</a> before adding recipe ingredients.</p>
+      <% } else { %>
+      <form method="POST" action="/admin/recipes/add" class="form-grid">
+        <input type="hidden" name="product_id" value="<%= selectedProductId %>">
+        <div class="form-group form-full">
+          <label>Product</label>
+          <%
+            const step2Cat   = [selProduct2.category, selProduct2.subcategory].filter(Boolean).join(' › ');
+            let step2Batch = ' ⚠ No batch size set';
+            if (selHeader2) {
+              step2Batch = ` — Batch: ${selHeader2.base_quantity} ${selHeader2.base_unit || ''}`;
+              if (selHeader2.batch_output_qty != null) step2Batch += ` → ${selHeader2.batch_output_qty} pcs output`;
+            }
+          %>
+          <input type="text" value="<%= selProduct2.name %><%= step2Cat ? ' (' + step2Cat + ')' : '' %><%= step2Batch %>" readonly style="background:#f5f5f5;color:#555;">
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="ing_category" onchange="ingCategoryChange()">
+            <option value="">-- All Categories --</option>
+            <% rmCategories.forEach(c => { %>
+              <option value="<%= c.name %>"><%= c.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Raw Material <span style="color:red">*</span></label>
+          <select name="raw_material_id" id="ing_raw_material" required>
+            <option value="">-- Select Raw Material --</option>
+            <% materials.forEach(m => { %>
+              <option value="<%= m.id %>"><%= m.name %><%= m.unit ? ' (' + m.unit + ')' : '' %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Quantity <span style="color:red">*</span></label>
+          <input type="number" name="quantity" step="0.0001" min="0" required placeholder="e.g. 98">
+        </div>
+        <div class="form-group">
+          <label>Unit <span style="color:red">*</span></label>
+          <select name="unit" required>
+            <option value="">-- Select --</option>
+            <% units.forEach(u => { %>
+              <option value="<%= u.name %>"><%= u.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="form-group form-full" style="display:none">
+          <label>Notes</label>
+          <input type="text" name="notes" placeholder="Optional note">
+        </div>
+        <div class="form-full">
+          <button type="submit" class="btn-primary">Add Ingredient</button>
+        </div>
+      </form>
+      <% } %>
+      <% } %>
+    </div>
+
+    <!-- Step 2b: Add Finished Product as Ingredient -->
+    <div class="card">
+      <h3>2b. Add Finished Product as Ingredient <span style="font-size:13px;font-weight:400;color:#757575;">— use another product's recipe as a component</span></h3>
+      <% if (!selectedProductId) { %>
+        <p style="color:#888;font-size:14px;">Select a product in Step 1 first.</p>
+      <% } else { %>
+      <% const selProduct2b = products.find(p => p.id == selectedProductId); %>
+      <% if (!selProduct2b) { %>
+        <p style="color:#e53935;">Selected product not found.</p>
+      <% } else { %>
+      <p style="font-size:13px;color:#555;margin:0 0 12px;">
+        When a sub-recipe product's raw materials change, its cost here updates automatically.
+      </p>
+      <form method="POST" action="/admin/recipes/add-sub" class="form-grid">
+        <input type="hidden" name="product_id" value="<%= selectedProductId %>">
+        <div class="form-group">
+          <label>Category</label>
+          <select id="sub2b_category" onchange="sub2bCategoryChange()">
+            <option value="">-- All Categories --</option>
+            <% const sub2bCats = [...new Set(products.map(p => p.category).filter(Boolean))].sort(); %>
+            <% sub2bCats.forEach(c => { %>
+              <option value="<%= c %>"><%= c %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Sub-category</label>
+          <select id="sub2b_subcategory" onchange="sub2bSubcategoryChange()">
+            <option value="">-- All Sub-categories --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Product <span style="color:red">*</span></label>
+          <select name="sub_product_id" id="sub2b_product" required>
+            <option value="">-- Select Product --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Quantity <span style="color:red">*</span></label>
+          <input type="number" name="quantity" step="0.0001" min="0.0001" required placeholder="e.g. 5">
+        </div>
+        <div class="form-group">
+          <label>Unit <span style="color:red">*</span></label>
+          <select name="unit" required>
+            <option value="">-- Select --</option>
+            <% units.forEach(u => { %>
+              <option value="<%= u.name %>"><%= u.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="form-full">
+          <button type="submit" class="btn-primary">Add Product Ingredient</button>
+        </div>
+      </form>
+      <% } %>
+      <% } %>
+    </div>
+
+    <!-- Recipes for selected product -->
+    <% if (selectedProductId) {
+         const recipeMap3 = {};
+         recipes.forEach(r => {
+           if (!recipeMap3[r.product_id]) recipeMap3[r.product_id] = [];
+           recipeMap3[r.product_id].push(r);
+         });
+         const headerMap3 = {};
+         headers.forEach(h => { headerMap3[h.product_id] = h; });
+         const selProduct3 = products.find(p => p.id == selectedProductId);
+    %>
+    <div class="card">
+      <% if (!selProduct3) { %>
+        <h3>3. Recipes</h3>
+        <p class="empty">Selected product not found.</p>
+      <% } else {
+           const items3    = recipeMap3[selectedProductId] || [];
+           const hdr3      = headerMap3[selectedProductId] || null;
+           const baseQty3  = hdr3 ? hdr3.base_quantity : null;
+           const baseUnit3 = hdr3 ? (hdr3.base_unit || selProduct3.unit || '') : (selProduct3.unit || '');
+           const catLabel3 = [selProduct3.category, selProduct3.subcategory].filter(Boolean).join(' › ');
+      %>
+      <h3>3. Recipes for <strong><%= selProduct3.name %></strong>
+        <% if (hdr3) { %>
+          <span style="font-size:13px;font-weight:400;color:#2e7d32;margin-left:8px;">(Batch: <%= hdr3.base_quantity %> <%= hdr3.base_unit || '' %>)</span>
+        <% } %>
+      </h3>
+
+      <div class="recipe-group">
+        <div class="recipe-group-header">
+          <div class="top-row">
+            <span>
+              <span class="product-title"><%= selProduct3.name %></span>
+              <% if (catLabel3) { %><span class="product-category"><%= catLabel3 %></span><% } %>
+            </span>
+            <% if (baseQty3) { %>
+              <span style="background:#e8f5e9;color:#2e7d32;padding:3px 10px;border-radius:12px;font-size:13px;">
+                Makes <strong><%= baseQty3 %> <%= baseUnit3 %></strong>
+                <% if (hdr3 && hdr3.batch_output_qty != null) { %>
+                  &rarr; <strong><%= hdr3.batch_output_qty %> pcs</strong>
+                <% } %>
+              </span>
+            <% } else { %>
+              <span style="color:#e53935;font-size:12px;">⚠ Batch size not set</span>
+            <% } %>
+          </div>
+          <% if (hdr3 && hdr3.batch_output_qty && items3.length > 0) { %>
+          <div class="scale-row">
+            <label>Scale to:</label>
+            <input type="number" class="scale-input" data-product="<%= selectedProductId %>"
+                   data-base="<%= hdr3.batch_output_qty %>" step="0.01" min="0" placeholder="<%= hdr3.batch_output_qty %>">
+            <span style="font-size:13px;color:#1565c0;">pcs</span>
+            <span class="scale-result" id="scale-result-<%= selectedProductId %>"></span>
+          </div>
+          <% } %>
+        </div>
+
+        <%
+          const subs3 = subRecipes || [];
+          const hasIngredients = items3.length > 0 || subs3.length > 0;
+        %>
+        <% if (!hasIngredients) { %>
+          <div class="recipe-empty">No ingredients added yet. Use Step 2 or 2b above to add ingredients.</div>
+        <% } else { %>
+          <%
+            let totalCost3 = 0;
+            let allPriced3 = true;
+            items3.forEach(item => {
+              if (item.rm_price != null) {
+                totalCost3 += item.quantity * item.rm_price;
+              } else {
+                allPriced3 = false;
+              }
+            });
+            // Include sub-recipe costs
+            subs3.forEach(sub => {
+              const subOutputQty = sub.sub_output_qty ? parseFloat(sub.sub_output_qty) : 0;
+              const subTotalCost = parseFloat(sub.sub_total_cost) || 0;
+              const subIngCount  = parseInt(sub.sub_ingredient_count) || 0;
+              const subMissing   = parseInt(sub.sub_missing_price_count) || 0;
+              if (subIngCount > 0 && subOutputQty > 0 && subMissing === 0) {
+                totalCost3 += (subTotalCost / subOutputQty) * sub.quantity;
+              } else {
+                allPriced3 = false;
+              }
+            });
+          %>
+          <table class="recipe-table">
+            <thead>
+              <tr>
+                <th>Ingredient</th>
+                <th class="num">Qty</th>
+                <% if (baseQty3) { %><th class="num">Scaled Qty</th><% } %>
+                <th>Unit</th>
+                <th class="num">Price/Unit</th>
+                <th class="num">Cost (Rs.)</th>
+                <% if (baseQty3) { %><th class="num">Scaled Cost</th><% } %>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% items3.forEach(item => { %>
+              <% const itemCost3 = item.rm_price != null ? item.quantity * item.rm_price : null; %>
+              <tr data-item-id="<%= item.id %>" data-product="<%= selectedProductId %>">
+                <td><%= item.raw_material_name %></td>
+                <td class="num">
+                  <span class="view-qty"><%= item.quantity %></span>
+                  <input type="number" class="edit-qty" step="0.0001" min="0"
+                         value="<%= item.quantity %>" style="display:none;width:72px;padding:3px 6px;font-size:13px;border:1px solid #ccc;border-radius:4px;">
+                </td>
+                <% if (baseQty3) { %>
+                <td class="num">
+                  <span class="scaled-qty" data-base-qty="<%= item.quantity %>">—</span>
+                </td>
+                <% } %>
+                <td>
+                  <span class="view-unit"><%= item.unit || item.rm_unit || '—' %></span>
+                  <select class="edit-unit" style="display:none;padding:3px 6px;font-size:13px;border:1px solid #ccc;border-radius:4px;">
+                    <option value="">—</option>
+                    <% units.forEach(u => { %>
+                      <option value="<%= u.name %>" <%= (item.unit || item.rm_unit) === u.name ? 'selected' : '' %>><%= u.name %></option>
+                    <% }) %>
+                  </select>
+                </td>
+                <td class="num">
+                  <% if (item.rm_price != null) { %>Rs. <%= item.rm_price %><% } else { %><span class="no-price">—</span><% } %>
+                </td>
+                <td class="num">
+                  <% if (itemCost3 != null) { %>
+                    <span class="item-cost" data-base-cost="<%= itemCost3 %>">Rs. <%= itemCost3.toFixed(2) %></span>
+                  <% } else { %><span class="no-price">—</span><% } %>
+                </td>
+                <% if (baseQty3) { %>
+                <td class="num">
+                  <% if (itemCost3 != null) { %>
+                    <span class="scaled-cost" data-base-cost="<%= itemCost3 %>">—</span>
+                  <% } else { %><span class="no-price">—</span><% } %>
+                </td>
+                <% } %>
+                <td>
+                  <span class="view-notes"><%= item.notes || '' %></span>
+                  <input type="text" class="edit-notes" style="display:none;width:100px;padding:3px 6px;font-size:13px;border:1px solid #ccc;border-radius:4px;"
+                         value="<%= item.notes || '' %>" placeholder="notes">
+                </td>
+                <td style="white-space:nowrap;">
+                  <span class="actions-view">
+                    <button class="btn-edit" onclick="startEdit(this)">Edit</button>
+                    <form method="POST" action="/admin/recipes/delete/<%= item.id %>"
+                          onsubmit="return confirm('Remove this ingredient?')" style="display:inline;margin:0;">
+                      <input type="hidden" name="product_id" value="<%= selectedProductId %>">
+                      <button class="btn-danger-sm">Remove</button>
+                    </form>
+                  </span>
+                  <span class="actions-edit" style="display:none;">
+                    <form method="POST" action="/admin/recipes/update/<%= item.id %>" style="display:inline;margin:0;" class="edit-form">
+                      <input type="hidden" name="product_id" value="<%= selectedProductId %>">
+                      <input type="hidden" name="quantity" class="hidden-qty">
+                      <input type="hidden" name="unit" class="hidden-unit">
+                      <input type="hidden" name="notes" class="hidden-notes">
+                      <button type="submit" class="btn-save">Save</button>
+                    </form>
+                    <button class="btn-cancel" onclick="cancelEdit(this)">Cancel</button>
+                  </span>
+                </td>
+              </tr>
+              <% }) %>
+
+              <% if (subs3.length > 0) { %>
+              <tr>
+                <td colspan="<%= 6 + (baseQty3 ? 2 : 0) %>"
+                    style="background:#e3f2fd;color:#0d47a1;font-size:12px;font-weight:600;padding:5px 12px;border-top:2px solid #90caf9;">
+                  Product Ingredients (Sub-recipes) — cost pulled live from each product's own recipe
+                </td>
+              </tr>
+              <% subs3.forEach(sub => { %>
+              <%
+                const subOutputQty3 = sub.sub_output_qty ? parseFloat(sub.sub_output_qty) : 0;
+                const subTotalCost3 = parseFloat(sub.sub_total_cost) || 0;
+                const subIngCount3  = parseInt(sub.sub_ingredient_count) || 0;
+                const subMissing3   = parseInt(sub.sub_missing_price_count) || 0;
+                const subCostPerUnit3 = (subIngCount3 > 0 && subOutputQty3 > 0 && subMissing3 === 0)
+                  ? subTotalCost3 / subOutputQty3 : null;
+                const subItemCost3 = subCostPerUnit3 != null ? subCostPerUnit3 * sub.quantity : null;
+                const subLabel3 = [sub.sub_product_category, sub.sub_product_subcategory].filter(Boolean).join(' › ');
+              %>
+              <tr data-sub-id="<%= sub.id %>" data-product="<%= selectedProductId %>" style="background:#f3f8ff;">
+                <td>
+                  <span style="font-weight:500;"><%= sub.sub_product_name %></span>
+                  <% if (subLabel3) { %><span style="font-size:11px;color:#90a4ae;margin-left:4px;">(<%= subLabel3 %>)</span><% } %>
+                  <span style="display:inline-block;background:#1565c0;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;margin-left:4px;">SUB-RECIPE</span>
+                </td>
+                <td class="num">
+                  <span class="view-sub-qty"><%= sub.quantity %></span>
+                  <input type="number" class="edit-sub-qty" step="0.0001" min="0"
+                         value="<%= sub.quantity %>" style="display:none;width:72px;padding:3px 6px;font-size:13px;border:1px solid #ccc;border-radius:4px;">
+                </td>
+                <% if (baseQty3) { %>
+                <td class="num">
+                  <% if (subItemCost3 != null) { %>
+                    <span class="scaled-qty" data-base-qty="<%= sub.quantity %>">—</span>
+                  <% } else { %><span class="no-price">—</span><% } %>
+                </td>
+                <% } %>
+                <td>
+                  <span class="view-sub-unit"><%= sub.unit || '—' %></span>
+                  <select class="edit-sub-unit" style="display:none;padding:3px 6px;font-size:13px;border:1px solid #ccc;border-radius:4px;">
+                    <option value="">—</option>
+                    <% units.forEach(u => { %>
+                      <option value="<%= u.name %>" <%= sub.unit === u.name ? 'selected' : '' %>><%= u.name %></option>
+                    <% }) %>
+                  </select>
+                </td>
+                <td class="num">
+                  <% if (subCostPerUnit3 != null) { %>
+                    <span style="font-size:12px;">Rs. <%= subCostPerUnit3.toFixed(4) %></span>
+                  <% } else { %>
+                    <span class="no-price" style="font-size:11px;">
+                      <% if (subIngCount3 === 0) { %>no recipe<% } else if (subOutputQty3 === 0) { %>no batch size<% } else { %>prices missing<% } %>
+                    </span>
+                  <% } %>
+                </td>
+                <td class="num">
+                  <% if (subItemCost3 != null) { %>
+                    <span class="item-cost" data-base-cost="<%= subItemCost3 %>">Rs. <%= subItemCost3.toFixed(2) %></span>
+                  <% } else { %><span class="no-price">—</span><% } %>
+                </td>
+                <% if (baseQty3) { %>
+                <td class="num">
+                  <% if (subItemCost3 != null) { %>
+                    <span class="scaled-cost" data-base-cost="<%= subItemCost3 %>">—</span>
+                  <% } else { %><span class="no-price">—</span><% } %>
+                </td>
+                <% } %>
+                <td><span style="font-size:11px;color:#90a4ae;">—</span></td>
+                <td style="white-space:nowrap;">
+                  <span class="actions-view-sub">
+                    <button class="btn-edit" onclick="startEditSub(this)">Edit</button>
+                    <form method="POST" action="/admin/recipes/delete-sub/<%= sub.id %>"
+                          onsubmit="return confirm('Remove this product ingredient?')" style="display:inline;margin:0;">
+                      <input type="hidden" name="product_id" value="<%= selectedProductId %>">
+                      <button class="btn-danger-sm">Remove</button>
+                    </form>
+                  </span>
+                  <span class="actions-edit-sub" style="display:none;">
+                    <form method="POST" action="/admin/recipes/update-sub/<%= sub.id %>" style="display:inline;margin:0;" class="edit-form-sub">
+                      <input type="hidden" name="product_id" value="<%= selectedProductId %>">
+                      <input type="hidden" name="quantity" class="hidden-sub-qty">
+                      <input type="hidden" name="unit" class="hidden-sub-unit">
+                      <button type="submit" class="btn-save">Save</button>
+                    </form>
+                    <button class="btn-cancel" onclick="cancelEditSub(this)">Cancel</button>
+                  </span>
+                </td>
+              </tr>
+              <% }) %>
+              <% } %>
+            </tbody>
+          </table>
+          <%
+            const wholesale3      = selProduct3.wholesale != null ? parseFloat(selProduct3.wholesale) : null;
+            const discount3       = hdr3 && hdr3.discount != null ? parseFloat(hdr3.discount) : 0;
+            const overhead3       = hdr3 && hdr3.overhead_pct != null ? parseFloat(hdr3.overhead_pct) : 0;
+            const productionLoss3 = hdr3 && hdr3.production_loss_pct != null ? parseFloat(hdr3.production_loss_pct) : 0;
+            const damagePct3      = hdr3 && hdr3.damage_pct != null ? parseFloat(hdr3.damage_pct) : 0;
+            const effWS3          = wholesale3 != null ? wholesale3 / (1 + discount3 / 100) : null;
+            const outputQty3      = hdr3 && hdr3.batch_output_qty != null ? parseFloat(hdr3.batch_output_qty) : null;
+            const lossCost3       = totalCost3 * (1 + productionLoss3 / 100);
+            const overheadAmt3    = lossCost3 * overhead3 / 100;
+            const effCost3        = lossCost3 + overheadAmt3;
+            const sellableOutput3 = outputQty3 != null ? outputQty3 * (1 - damagePct3 / 100) : null;
+            const income3         = effWS3 != null && sellableOutput3 != null ? effWS3 * sellableOutput3 : null;
+            const margin3         = income3 != null && allPriced3 ? income3 - effCost3 : null;
+            const marginPct3      = margin3 != null && income3 > 0 ? (margin3 / income3) * 100 : null;
+            const marginPc3       = margin3 != null && sellableOutput3 != null && sellableOutput3 > 0 ? margin3 / sellableOutput3 : null;
+          %>
+          <div class="recipe-totals"
+               id="totals-<%= selectedProductId %>"
+               data-base-cost="<%= totalCost3.toFixed(2) %>"
+               data-base-qty="<%= baseQty3 || 0 %>"
+               data-base-unit="<%= baseUnit3 %>"
+               data-wholesale="<%= wholesale3 != null ? wholesale3 : '' %>"
+               data-batch-output="<%= outputQty3 != null ? outputQty3 : '' %>"
+               data-discount="<%= discount3 %>"
+               data-overhead="<%= overhead3 %>"
+               data-production-loss="<%= productionLoss3 %>"
+               data-damage-pct="<%= damagePct3 %>">
+            <span>
+              <span class="tot-label" id="tot-label-<%= selectedProductId %>">
+                Total Cost (<%= baseQty3 ? baseQty3 + ' ' + baseUnit3 : 'base' %>):
+              </span>
+              <span class="tot-value" id="tot-cost-<%= selectedProductId %>">
+                Rs. <%= totalCost3.toFixed(2) %>
+                <% if (!allPriced3) { %><span style="color:#e65100;font-weight:400;font-size:11px;"> (some prices missing)</span><% } %>
+              </span>
+            </span>
+            <% if (productionLoss3 > 0) { %>
+            <span>
+              <span class="tot-label">+ Production Loss (<%= productionLoss3 %>%): </span>
+              <span class="tot-value" style="color:#e65100;">Rs. <%= (lossCost3 - totalCost3).toFixed(2) %></span>
+            </span>
+            <% } %>
+            <% if (overhead3 > 0) { %>
+            <span>
+              <span class="tot-label">+ Overhead (<%= overhead3 %>% of cost): </span>
+              <span class="tot-value" style="color:#e65100;">Rs. <%= overheadAmt3.toFixed(2) %></span>
+            </span>
+            <% } %>
+            <% if (damagePct3 > 0 && outputQty3) { %>
+            <span>
+              <span class="tot-label">Return (<%= damagePct3 %>%): </span>
+              <span class="tot-value" style="color:#e65100;"><%= (outputQty3 - sellableOutput3).toFixed(1) %> pcs lost → <%= sellableOutput3.toFixed(1) %> sellable</span>
+            </span>
+            <% } %>
+            <% if (outputQty3 && outputQty3 > 0) { %>
+            <span>
+              <span class="tot-label">Cost per sellable pc: </span>
+              <span class="tot-value">Rs. <%= (effCost3 / (sellableOutput3 > 0 ? sellableOutput3 : outputQty3)).toFixed(2) %></span>
+            </span>
+            <% if (effWS3 != null) { %>
+            <span>
+              <span class="tot-label">Income per pc: </span>
+              <span class="tot-value" style="color:#1976d2;">Rs. <%= effWS3.toFixed(2) %></span>
+            </span>
+            <% if (marginPc3 != null) { %>
+            <span>
+              <span class="tot-label">Margin per pc: </span>
+              <span class="tot-value" id="tot-margin-pc-<%= selectedProductId %>" style="color:<%= marginPc3 >= 0 ? '#2e7d32' : '#c62828' %>;">Rs. <%= marginPc3.toFixed(2) %></span>
+            </span>
+            <% } %>
+            <% } %>
+            <% } else if (baseQty3 && baseQty3 > 0) { %>
+            <span>
+              <span class="tot-label">Cost per <%= baseUnit3 %>: </span>
+              <span class="tot-value">Rs. <%= (effCost3 / baseQty3).toFixed(2) %></span>
+            </span>
+            <% } %>
+            <% if (wholesale3 != null && discount3 > 0) { %>
+            <span>
+              <span class="tot-label">Discount: </span>
+              <span class="tot-value" id="tot-discount-<%= selectedProductId %>" style="color:#e65100;"><%= discount3 %>% &rarr; Eff. WS Rs. <%= effWS3.toFixed(2) %></span>
+            </span>
+            <% } %>
+            <% if (income3 != null) { %>
+            <span>
+              <span class="tot-label">Total Income: </span>
+              <span class="tot-value" id="tot-income-<%= selectedProductId %>" style="color:#1976d2;">Rs. <%= income3.toFixed(2) %></span>
+            </span>
+            <% } %>
+            <% if (margin3 != null) { %>
+            <span>
+              <span class="tot-label">Total Margin: </span>
+              <span class="tot-value" id="tot-margin-<%= selectedProductId %>" style="color:<%= margin3 >= 0 ? '#2e7d32' : '#c62828' %>;">Rs. <%= margin3.toFixed(2) %></span>
+            </span>
+            <% } %>
+            <% if (marginPct3 != null) { %>
+            <span>
+              <span class="tot-label">Margin %: </span>
+              <span class="tot-value" id="tot-margin-pct-<%= selectedProductId %>" style="color:<%= marginPct3 >= 0 ? '#2e7d32' : '#c62828' %>;"><%= marginPct3.toFixed(1) %>%</span>
+            </span>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+      <% } /* selProduct3 */ %>
+    </div>
+    <% } /* selectedProductId */ %>
+  </main>
+
+  <script src="/nepali-calendar.js"></script>
+  <script>
+    // --- Step 2b: Cascading product picker for sub-recipe ---
+    const EXISTING_SUB_IDS = <%- JSON.stringify((subRecipes || []).map(s => parseInt(s.sub_product_id))) %>;
+
+    function sub2bGetFiltered() {
+      const cat = document.getElementById('sub2b_category') ? document.getElementById('sub2b_category').value : '';
+      const sub = document.getElementById('sub2b_subcategory') ? document.getElementById('sub2b_subcategory').value : '';
+      return SUB2B_PRODS.filter(p =>
+        (!cat || p.category === cat) &&
+        (!sub || p.subcategory === sub) &&
+        !EXISTING_SUB_IDS.includes(p.id)
+      );
+    }
+
+    function sub2bCategoryChange() {
+      const cat = document.getElementById('sub2b_category').value;
+      const subSel = document.getElementById('sub2b_subcategory');
+      const subs = [...new Set(
+        SUB2B_PRODS.filter(p => !cat || p.category === cat).map(p => p.subcategory).filter(Boolean)
+      )].sort();
+      subSel.innerHTML = '<option value="">-- All Sub-categories --</option>' +
+        subs.map(s => `<option value="${s}">${s}</option>`).join('');
+      sub2bSubcategoryChange();
+    }
+
+    function sub2bSubcategoryChange() {
+      const prodSel = document.getElementById('sub2b_product');
+      if (!prodSel) return;
+      const filtered = sub2bGetFiltered();
+      prodSel.innerHTML = '<option value="">-- Select Product --</option>' +
+        filtered.map(p => {
+          const cat = [p.category, p.subcategory].filter(Boolean).join(' › ');
+          return `<option value="${p.id}">${p.name}${cat ? ' (' + cat + ')' : ''}</option>`;
+        }).join('');
+    }
+
+    // --- Inline edit for sub-recipe rows ---
+    function startEditSub(btn) {
+      const row = btn.closest('tr');
+      row.querySelector('.view-sub-qty').style.display = 'none';
+      row.querySelector('.edit-sub-qty').style.display = '';
+      row.querySelector('.view-sub-unit').style.display = 'none';
+      row.querySelector('.edit-sub-unit').style.display = '';
+      row.querySelector('.actions-view-sub').style.display = 'none';
+      row.querySelector('.actions-edit-sub').style.display = '';
+    }
+
+    function cancelEditSub(btn) {
+      const row = btn.closest('tr');
+      row.querySelector('.view-sub-qty').style.display = '';
+      row.querySelector('.edit-sub-qty').style.display = 'none';
+      row.querySelector('.view-sub-unit').style.display = '';
+      row.querySelector('.edit-sub-unit').style.display = 'none';
+      row.querySelector('.actions-view-sub').style.display = '';
+      row.querySelector('.actions-edit-sub').style.display = 'none';
+    }
+
+    document.querySelectorAll('.edit-form-sub').forEach(form => {
+      form.addEventListener('submit', function() {
+        const row = this.closest('tr');
+        this.querySelector('.hidden-sub-qty').value  = row.querySelector('.edit-sub-qty').value;
+        this.querySelector('.hidden-sub-unit').value = row.querySelector('.edit-sub-unit').value;
+      });
+    });
+
+    // --- Step 2: Category filter for Raw Material ---
+    const ALL_MATERIALS_ING = <%- JSON.stringify(materials.map(m => ({
+      id: m.id,
+      name: m.name,
+      unit: m.unit || '',
+      category: m.category || ''
+    }))) %>;
+
+    function ingCategoryChange() {
+      const cat = document.getElementById('ing_category').value;
+      const sel = document.getElementById('ing_raw_material');
+      if (!sel) return;
+      const prev = sel.value;
+      const filtered = cat ? ALL_MATERIALS_ING.filter(m => m.category === cat) : ALL_MATERIALS_ING;
+      sel.innerHTML = '<option value="">-- Select Raw Material --</option>' +
+        filtered.map(m => `<option value="${m.id}">${m.name}${m.unit ? ' (' + m.unit + ')' : ''}</option>`).join('');
+      sel.value = prev;
+    }
+
+    // --- Step 1: Cascading product picker ---
+    function bsGetFiltered() {
+      const cat = document.getElementById('bs_category').value;
+      const sub = document.getElementById('bs_subcategory').value;
+      return ALL_PRODUCTS.filter(p =>
+        (!cat || p.category === cat) &&
+        (!sub || p.subcategory === sub)
+      );
+    }
+
+    function bsCategoryChange() {
+      const cat = document.getElementById('bs_category').value;
+      const subSel = document.getElementById('bs_subcategory');
+      const subs = [...new Set(
+        ALL_PRODUCTS.filter(p => !cat || p.category === cat)
+          .map(p => p.subcategory).filter(Boolean)
+      )].sort();
+      subSel.innerHTML = '<option value="">-- All Sub-categories --</option>' +
+        subs.map(s => `<option value="${s}">${s}</option>`).join('');
+      bsSubcategoryChange();
+    }
+
+    function bsSubcategoryChange() {
+      const prodSel = document.getElementById('bs_product_display');
+      const filtered = bsGetFiltered();
+      prodSel.innerHTML = '<option value="">-- Select Product --</option>' +
+        filtered.map(p => {
+          const badge = p.batchLabel ? ` — ${p.batchLabel}` : '';
+          return `<option value="${p.id}">${p.name}${badge}</option>`;
+        }).join('');
+      bsProductChange();
+    }
+
+    function bsProductChange() {
+      const id = document.getElementById('bs_product_display').value;
+      document.getElementById('bs_product_id').value = id;
+      const p = ALL_PRODUCTS.find(x => String(x.id) === String(id));
+      document.getElementById('bs_unit_display').value = p ? p.unit      : '';
+      document.getElementById('bs_qty_display').value  = p ? p.qty       : '';
+      document.getElementById('bs_ws_display').value   = p ? p.wholesale : '';
+      document.getElementById('bs_mrp_display').value  = p ? p.mrp       : '';
+      document.getElementById('bs_discount').value         = p && p.discount !== '' && p.discount != null ? p.discount : '';
+      document.getElementById('bs_overhead').value         = p && p.overhead !== '' && p.overhead != null ? p.overhead : '';
+      document.getElementById('bs_production_loss').value  = p && p.productionLoss !== '' && p.productionLoss != null ? p.productionLoss : '';
+      document.getElementById('bs_damage_pct').value       = p && p.damagePct !== '' && p.damagePct != null ? p.damagePct : '';
+      updateEffWs();
+
+      document.getElementById('bs_batch_qty').value    = p ? (p.batchQty    || '') : '';
+      document.getElementById('bs_batch_output').value = p ? (p.batchOutput || '') : '';
+      const unitSel = document.getElementById('bs_batch_unit');
+      if (unitSel && p && p.batchUnit) {
+        unitSel.value = p.batchUnit;
+      } else if (unitSel) {
+        unitSel.value = '';
+      }
+    }
+
+    function updateEffWs() {
+      const ws   = parseFloat(document.getElementById('bs_ws_display').value);
+      const disc = parseFloat(document.getElementById('bs_discount').value) || 0;
+      const effEl = document.getElementById('bs_eff_ws_display');
+      effEl.value = (!isNaN(ws) && ws > 0) ? (ws / (1 + disc / 100)).toFixed(2) : '';
+    }
+
+    function validateBatchForm() {
+      if (!document.getElementById('bs_product_id').value) {
+        alert('Please select a product.'); return false;
+      }
+      return true;
+    }
+
+    const SEL_ID = <%- selectedProductId || 'null' %>;
+    const SUB2B_PRODS = ALL_PRODUCTS.filter(p => p.id !== SEL_ID);
+
+    if (document.getElementById('sub2b_category')) sub2bCategoryChange();
+
+    // Initialise product list on load — pre-select if product_id in URL
+    if (SEL_ID) {
+      const selP = ALL_PRODUCTS.find(x => x.id == SEL_ID);
+      if (selP) {
+        document.getElementById('bs_category').value = selP.category || '';
+        bsCategoryChange();
+        document.getElementById('bs_subcategory').value = selP.subcategory || '';
+        bsSubcategoryChange();
+        document.getElementById('bs_product_display').value = SEL_ID;
+        bsProductChange();
+      } else {
+        bsSubcategoryChange();
+      }
+    } else {
+      bsSubcategoryChange();
+    }
+
+    // --- Inline edit ---
+    function startEdit(btn) {
+      const row = btn.closest('tr');
+      row.querySelector('.view-qty').style.display = 'none';
+      row.querySelector('.edit-qty').style.display = '';
+      row.querySelector('.view-unit').style.display = 'none';
+      row.querySelector('.edit-unit').style.display = '';
+      row.querySelector('.view-notes').style.display = 'none';
+      row.querySelector('.edit-notes').style.display = '';
+      row.querySelector('.actions-view').style.display = 'none';
+      row.querySelector('.actions-edit').style.display = '';
+    }
+
+    function cancelEdit(btn) {
+      const row = btn.closest('tr');
+      row.querySelector('.view-qty').style.display = '';
+      row.querySelector('.edit-qty').style.display = 'none';
+      row.querySelector('.view-unit').style.display = '';
+      row.querySelector('.edit-unit').style.display = 'none';
+      row.querySelector('.view-notes').style.display = '';
+      row.querySelector('.edit-notes').style.display = 'none';
+      row.querySelector('.actions-view').style.display = '';
+      row.querySelector('.actions-edit').style.display = 'none';
+    }
+
+    // Copy edit field values into hidden inputs before form submit
+    document.querySelectorAll('.edit-form').forEach(form => {
+      form.addEventListener('submit', function() {
+        const row = this.closest('tr');
+        this.querySelector('.hidden-qty').value   = row.querySelector('.edit-qty').value;
+        this.querySelector('.hidden-unit').value  = row.querySelector('.edit-unit').value;
+        this.querySelector('.hidden-notes').value = row.querySelector('.edit-notes').value;
+      });
+    });
+
+    // --- Scaling calculator ---
+    function fmt(n) { return n.toFixed(4).replace(/\.?0+$/, ''); }
+
+    function applyScale(productId, targetQty, baseQty) {
+      const factor = baseQty > 0 ? targetQty / baseQty : 1;
+
+      // Scale ingredient quantities
+      document.querySelectorAll(`tr[data-product="${productId}"] .scaled-qty`).forEach(el => {
+        const base = parseFloat(el.dataset.baseQty);
+        el.textContent = isNaN(base) ? '—' : fmt(base * factor);
+      });
+
+      // Scale per-ingredient costs
+      document.querySelectorAll(`tr[data-product="${productId}"] .scaled-cost`).forEach(el => {
+        const base = parseFloat(el.dataset.baseCost);
+        el.textContent = isNaN(base) ? '—' : 'Rs. ' + (base * factor).toFixed(2);
+      });
+
+      // Scale totals bar using server-calculated base cost
+      const totalsDiv = document.getElementById('totals-' + productId);
+      if (!totalsDiv) return;
+      const baseCost       = parseFloat(totalsDiv.dataset.baseCost);
+      const baseUnit       = totalsDiv.dataset.baseUnit;
+      const wholesale      = parseFloat(totalsDiv.dataset.wholesale);
+      const discount       = parseFloat(totalsDiv.dataset.discount) || 0;
+      const overhead       = parseFloat(totalsDiv.dataset.overhead) || 0;
+      const productionLoss = parseFloat(totalsDiv.dataset.productionLoss) || 0;
+      const damagePct      = parseFloat(totalsDiv.dataset.damagePct) || 0;
+      const effWS          = !isNaN(wholesale) ? wholesale / (1 + discount / 100) : NaN;
+      const batchOutput    = parseFloat(totalsDiv.dataset.batchOutput);
+      const scaledCost     = isNaN(baseCost) ? 0 : baseCost * factor;
+      const scaledEffCost  = scaledCost * (1 + productionLoss / 100) * (1 + overhead / 100);
+
+      const labelEl  = document.getElementById('tot-label-'      + productId);
+      const costEl   = document.getElementById('tot-cost-'       + productId);
+      const incEl    = document.getElementById('tot-income-'     + productId);
+      const marEl    = document.getElementById('tot-margin-'     + productId);
+      const marPctEl = document.getElementById('tot-margin-pct-' + productId);
+      const mpcEl    = document.getElementById('tot-margin-pc-'  + productId);
+
+      if (labelEl) labelEl.textContent = `Total Cost (${fmt(targetQty)} pcs):`;
+      if (costEl)  costEl.textContent  = 'Rs. ' + scaledCost.toFixed(2);
+
+      if (incEl && !isNaN(effWS) && !isNaN(batchOutput)) {
+        const scaledOutputQty = targetQty;
+        const scaledSellableQty = scaledOutputQty * (1 - damagePct / 100);
+        const scaledIncome = effWS * scaledSellableQty;
+        incEl.textContent  = 'Rs. ' + scaledIncome.toFixed(2);
+        if (marEl) {
+          const scaledMargin = scaledIncome - scaledEffCost;
+          marEl.textContent  = 'Rs. ' + scaledMargin.toFixed(2);
+          marEl.style.color  = scaledMargin >= 0 ? '#2e7d32' : '#c62828';
+          if (marPctEl && scaledIncome > 0) {
+            const pct = (scaledMargin / scaledIncome) * 100;
+            marPctEl.textContent = pct.toFixed(1) + '%';
+            marPctEl.style.color = pct >= 0 ? '#2e7d32' : '#c62828';
+          }
+        }
+        if (mpcEl && scaledSellableQty > 0) {
+          const mpc = (scaledIncome - scaledEffCost) / scaledSellableQty;
+          mpcEl.textContent = 'Rs. ' + mpc.toFixed(2);
+          mpcEl.style.color = mpc >= 0 ? '#2e7d32' : '#c62828';
+        }
+      }
+    }
+
+    document.querySelectorAll('.scale-input').forEach(input => {
+      input.addEventListener('input', function() {
+        const productId = this.dataset.product;
+        const baseQty   = parseFloat(this.dataset.base);
+        const targetQty = parseFloat(this.value);
+        if (!isNaN(targetQty) && targetQty > 0) {
+          applyScale(productId, targetQty, baseQty);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

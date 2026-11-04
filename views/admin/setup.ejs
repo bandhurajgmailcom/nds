@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup - <%= companyName %></title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .setup-card {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 24px 28px;
+      max-width: 560px;
+    }
+    .setup-card h3 {
+      margin: 0 0 18px;
+      font-size: 15px;
+      color: #1565c0;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 2px solid #e3f2fd;
+      padding-bottom: 8px;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 7px 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: #1565c0;
+      box-shadow: 0 0 0 2px #e3f2fd;
+    }
+    .form-actions {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .btn-save {
+      padding: 8px 22px;
+      background: #1565c0;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-save:hover { background: #0d47a1; }
+  </style>
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+  <main class="main-content">
+    <div class="page-header">
+      <h2>⚙️ Setup</h2>
+    </div>
+
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+    <% if (error)   { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <form method="POST" action="/admin/setup">
+      <div class="setup-card">
+        <h3>Company Information</h3>
+
+        <div class="form-group">
+          <label for="company_name">Company Name</label>
+          <input type="text" id="company_name" name="company_name"
+                 value="<%= settings.company_name || '' %>" placeholder="e.g. Nepal Dairy Pvt. Ltd.">
+        </div>
+
+        <div class="form-group">
+          <label for="company_address">Address</label>
+          <input type="text" id="company_address" name="company_address"
+                 value="<%= settings.company_address || '' %>" placeholder="e.g. Kathmandu, Nepal">
+        </div>
+
+        <div class="form-group">
+          <label for="company_phone">Phone</label>
+          <input type="text" id="company_phone" name="company_phone"
+                 value="<%= settings.company_phone || '' %>" placeholder="e.g. 01-4XXXXXX">
+        </div>
+
+        <div class="form-group">
+          <label for="company_email">Email</label>
+          <input type="email" id="company_email" name="company_email"
+                 value="<%= settings.company_email || '' %>" placeholder="e.g. info@nepaldairy.com.np">
+        </div>
+
+        <div class="form-group">
+          <label for="company_pan">PAN / VAT No.</label>
+          <input type="text" id="company_pan" name="company_pan"
+                 value="<%= settings.company_pan || '' %>" placeholder="e.g. 123456789">
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-save">Save Settings</button>
+        </div>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raw Material Receipt - <%= companyName %></title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .plan-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .plan-table th { background: #f5f5f5; padding: 7px 12px; text-align: left; font-size: 12px; color: #555; font-weight: 600; border-bottom: 2px solid #e0e0e0; white-space: nowrap; }
+    .plan-table th.num { text-align: right; }
+    .plan-table td { padding: 7px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; font-size: 13px; }
+    .plan-table td.num { text-align: right; }
+    .plan-table tr:hover td { background: #fafafa; }
+    .plan-table tr:last-child td { border-bottom: none; }
+    .cat-row td { background: #e3f2fd; font-weight: 700; color: #1565c0; font-size: 12px; padding: 4px 12px; border-bottom: 1px solid #bbdefb; }
+
+    .scale-input { width: 90px; padding: 4px 7px; font-size: 13px; border: 1px solid #90caf9; border-radius: 4px; text-align: right; }
+    .scale-input:focus { outline: none; border-color: #1976d2; box-shadow: 0 0 0 2px #e3f2fd; }
+
+    .result-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .result-table th { background: #1976d2; color: #fff; padding: 8px 12px; text-align: left; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .result-table th.num { text-align: right; }
+    .result-table td { padding: 8px 12px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
+    .result-table td.num { text-align: right; }
+    .result-table tr:hover td { background: #f5f5f5; }
+    .result-table .cat-group td { background: #e8f5e9; font-weight: 700; color: #2e7d32; font-size: 12px; padding: 5px 12px; }
+    .result-table .total-row td { background: #fff8e1; font-weight: 700; border-top: 2px solid #ffc107; }
+    .result-table .total-row td.num { color: #e65100; }
+
+    .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .summary-table th { background: #388e3c; color: #fff; padding: 8px 12px; text-align: left; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .summary-table th.num { text-align: right; }
+    .summary-table td { padding: 8px 12px; border-bottom: 1px solid #e0e0e0; vertical-align: middle; }
+    .summary-table td.num { text-align: right; }
+    .summary-table tr:hover td { background: #f9fbe7; }
+    .summary-table .cat-group td { background: #e3f2fd; font-weight: 700; color: #1565c0; font-size: 12px; padding: 5px 12px; }
+    .summary-table .total-row td { background: #fff8e1; font-weight: 700; border-top: 2px solid #ffc107; }
+    .summary-table .total-row td.num { color: #e65100; }
+    .positive { color: #2e7d32; font-weight: 600; }
+    .negative { color: #c62828; font-weight: 600; }
+
+    .missing-note { color: #e65100; font-size: 11px; }
+    .empty-result { padding: 20px; color: #9e9e9e; font-style: italic; text-align: center; }
+
+    .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+    .btn-clear { padding: 5px 14px; font-size: 13px; background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; border-radius: 4px; cursor: pointer; }
+    .btn-clear:hover { background: #ffe0b2; }
+
+    .filter-bar { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; padding: 10px 0 6px; }
+    .filter-bar .fg { display: flex; flex-direction: column; gap: 3px; }
+    .filter-bar label { font-size: 11px; color: #757575; font-weight: 600; }
+    .filter-bar select, .filter-bar input[type=text] { padding: 5px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; min-width: 140px; }
+    .filter-bar select:focus, .filter-bar input:focus { outline: none; border-color: #1976d2; }
+    .btn-filter-clear { padding: 5px 12px; font-size: 12px; background: #f5f5f5; color: #555; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; align-self: flex-end; }
+    .btn-filter-clear:hover { background: #e0e0e0; }
+
+    @media print {
+      .no-print { display: none !important; }
+      nav, .navbar, header { display: none !important; }
+      .main-content { margin: 0; padding: 0; }
+      .card { box-shadow: none; border: none; }
+      .result-table th { background: #1976d2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .result-table .cat-group td { background: #e8f5e9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .result-table .total-row td { background: #fff8e1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <%- include('../partials/navbar') %>
+  <main class="main-content">
+    <div class="page-header">
+      <h2>🧾 Raw Material Receipt</h2>
+      <div style="display:flex;gap:8px;" class="no-print">
+        <a href="/admin/recipe-summary" style="text-decoration:none;padding:6px 14px;font-size:14px;background:#e3f2fd;color:#1565c0;border-radius:4px;">Recipe Summary</a>
+        <a href="/admin/recipes" style="text-decoration:none;padding:6px 14px;font-size:14px;background:#f5f5f5;color:#555;border-radius:4px;">Recipes</a>
+        <button onclick="exportAllCSV()" style="padding:6px 14px;font-size:14px;background:#fff3e0;color:#e65100;border:1px solid #ffcc80;border-radius:4px;cursor:pointer;">Export CSV</button>
+        <button onclick="exportExcel(this)" style="padding:6px 14px;font-size:14px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:4px;cursor:pointer;">Export Excel</button>
+        <button onclick="window.print()" style="padding:6px 14px;font-size:14px;background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8;border-radius:4px;cursor:pointer;">Print</button>
+      </div>
+    </div>
+
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <% if (headers.length === 0) { %>
+      <div class="card">
+        <p style="color:#9e9e9e;font-style:italic;">No products with recipes found. Add recipes with batch output quantities first.</p>
+      </div>
+    <% } else { %>
+
+    <!-- Production Plan: Scale inputs per product -->
+    <div class="card no-print">
+      <div class="toolbar">
+        <h3 style="margin:0;">Production Plan</h3>
+        <span style="font-size:13px;color:#757575;">Enter output quantity (pcs) for each product you want to produce.</span>
+        <button class="btn-clear" onclick="clearAll()">Clear All</button>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-bar">
+        <div class="fg">
+          <label>Category</label>
+          <select id="f_category" onchange="filterCategoryChange()">
+            <option value="">All Categories</option>
+            <% const fCats = [...new Set(headers.map(h => h.category).filter(Boolean))].sort(); %>
+            <% fCats.forEach(c => { %><option value="<%= c %>"><%= c %></option><% }) %>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Sub-category</label>
+          <select id="f_subcategory" onchange="applyFilter()">
+            <option value="">All Sub-categories</option>
+            <% const fSubs = [...new Set(headers.map(h => h.subcategory).filter(Boolean))].sort(); %>
+            <% fSubs.forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Product</label>
+          <input type="text" id="f_product" placeholder="Search product name…" oninput="applyFilter()">
+        </div>
+        <button class="btn-filter-clear" onclick="clearFilters()">Clear Filters</button>
+      </div>
+
+      <table class="plan-table" style="margin-top:6px;">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Sub-category</th>
+            <th class="num">Batch Output (pcs)</th>
+            <th class="num">Scale to (pcs)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <%
+            let lastCat = null;
+            headers.forEach(h => {
+              const cat = h.category || '(No Category)';
+          %>
+          <% if (cat !== lastCat) { lastCat = cat; %>
+          <tr class="cat-row" data-cat-header="<%= cat %>"><td colspan="5"><%= cat %></td></tr>
+          <% } %>
+          <tr class="product-row"
+              data-category="<%= h.category || '' %>"
+              data-subcategory="<%= h.subcategory || '' %>"
+              data-name="<%= h.product_name.toLowerCase() %>">
+            <td><%= h.product_name %></td>
+            <td><%= h.category || '—' %></td>
+            <td><%= h.subcategory || '—' %></td>
+            <td class="num"><%= h.batch_output_qty %></td>
+            <td class="num">
+              <input type="number" class="scale-input"
+                     id="scale-<%= h.product_id %>"
+                     data-product-id="<%= h.product_id %>"
+                     data-batch-output="<%= h.batch_output_qty %>"
+                     min="0" step="1" placeholder="0"
+                     oninput="calculate()">
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Print header (only visible when printing) -->
+    <div style="display:none;" class="print-only" id="printHeader">
+      <h2 style="margin:0 0 4px 0;">Nepal Dairy NDS — Raw Material Receipt</h2>
+      <div id="printPlanSummary" style="font-size:13px;color:#555;margin-bottom:8px;"></div>
+    </div>
+
+    <!-- Scaled Production Summary -->
+    <div class="card" id="summaryCard" style="padding:0;overflow:hidden;display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;flex-wrap:wrap;gap:8px;" class="no-print">
+        <h3 style="margin:0;">Production Summary</h3>
+        <button onclick="printSection('summary')" style="padding:5px 12px;font-size:13px;background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8;border-radius:4px;cursor:pointer;">Print</button>
+      </div>
+      <div id="summaryContent"></div>
+    </div>
+
+    <!-- Raw Material Requirements -->
+    <div class="card" id="resultsCard" style="padding:0;overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px 6px;flex-wrap:wrap;gap:8px;" class="no-print">
+        <h3 style="margin:0;">Raw Material Requirements</h3>
+        <button onclick="printSection('rm')" style="padding:5px 12px;font-size:13px;background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8;border-radius:4px;cursor:pointer;">Print</button>
+      </div>
+      <div id="resultsContent" class="empty-result">
+        Enter quantities above to calculate required raw materials.
+      </div>
+    </div>
+
+    <% } %>
+  </main>
+
+  <script>
+    const HEADERS         = <%- JSON.stringify(headers) %>;
+    const RECIPES         = <%- JSON.stringify(recipes) %>;
+    const SUB_RECIPES     = <%- JSON.stringify(subRecipes) %>;
+    const SUB_INGREDIENTS = <%- JSON.stringify(subIngredients) %>;
+
+    // last calculated data, used by export functions
+    let _lastRMItems = [];
+    let _lastSummaryRows = [];
+
+    function fmt(n) {
+      const r = parseFloat(n.toFixed(4));
+      return r % 1 === 0 ? r.toFixed(0) : r.toString();
+    }
+
+    function clearAll() {
+      document.querySelectorAll('.scale-input').forEach(el => { el.value = ''; });
+      calculate();
+    }
+
+    function filterCategoryChange() {
+      const cat = document.getElementById('f_category').value;
+      const subSel = document.getElementById('f_subcategory');
+      const subs = [...new Set(
+        HEADERS.filter(h => !cat || h.category === cat).map(h => h.subcategory).filter(Boolean)
+      )].sort();
+      subSel.innerHTML = '<option value="">All Sub-categories</option>' +
+        subs.map(s => `<option value="${s}">${s}</option>`).join('');
+      applyFilter();
+    }
+
+    function applyFilter() {
+      const cat  = document.getElementById('f_category').value;
+      const sub  = document.getElementById('f_subcategory').value;
+      const name = document.getElementById('f_product').value.toLowerCase().trim();
+      document.querySelectorAll('.product-row').forEach(row => {
+        const match =
+          (!cat  || row.dataset.category    === cat) &&
+          (!sub  || row.dataset.subcategory === sub) &&
+          (!name || row.dataset.name.includes(name));
+        row.style.display = match ? '' : 'none';
+      });
+      document.querySelectorAll('.cat-row').forEach(catRow => {
+        const catName = catRow.dataset.catHeader;
+        const anyVisible = [...document.querySelectorAll(`.product-row[data-category="${catName}"]`)]
+          .some(r => r.style.display !== 'none');
+        catRow.style.display = anyVisible ? '' : 'none';
+      });
+    }
+
+    function clearFilters() {
+      document.getElementById('f_category').value = '';
+      filterCategoryChange();
+      document.getElementById('f_product').value = '';
+      applyFilter();
+    }
+
+    function calculate() {
+      const aggregated   = {};
+      const productLines = [];
+      const summaryRows  = [];
+
+      function addToAgg(ing, qty) {
+        const key = ing.raw_material_id;
+        if (!aggregated[key]) {
+          aggregated[key] = {
+            id: key, name: ing.raw_material_name,
+            category: ing.rm_category || '',
+            unit: ing.unit || ing.rm_unit || '',
+            price: ing.rm_price, totalQty: 0, totalCost: 0, missingPrice: false
+          };
+        }
+        aggregated[key].totalQty += qty;
+        if (ing.rm_price != null) aggregated[key].totalCost += qty * ing.rm_price;
+        else aggregated[key].missingPrice = true;
+      }
+
+      HEADERS.forEach(h => {
+        const el = document.getElementById('scale-' + h.product_id);
+        const targetPcs = el ? parseFloat(el.value) : NaN;
+        if (isNaN(targetPcs) || targetPcs <= 0) return;
+
+        productLines.push(`${h.product_name}: ${targetPcs} pcs`);
+        const factor = targetPcs / h.batch_output_qty;
+
+        const productionLoss = parseFloat(h.production_loss_pct) || 0;
+        const damagePct      = parseFloat(h.damage_pct) || 0;
+        const lossMult       = 1 + productionLoss / 100;
+        const sellablePcs    = targetPcs * (1 - damagePct / 100);
+
+        // --- Direct raw material aggregation (loss increases qty needed) ---
+        RECIPES.filter(r => r.product_id === h.product_id).forEach(ing => {
+          addToAgg(ing, ing.quantity * factor * lossMult);
+        });
+
+        // --- Sub-recipe expansion ---
+        SUB_RECIPES.filter(sr => sr.product_id === h.product_id).forEach(sr => {
+          const subOutputQty = parseFloat(sr.sub_output_qty);
+          if (!subOutputQty || subOutputQty <= 0) return;
+          const subFactor = factor * parseFloat(sr.quantity) / subOutputQty;
+          SUB_INGREDIENTS.filter(si => si.product_id === sr.sub_product_id).forEach(ing => {
+            addToAgg(ing, ing.quantity * subFactor * lossMult);
+          });
+        });
+
+        // --- Production summary row ---
+        let baseCost = 0; let allPriced = true;
+        RECIPES.filter(r => r.product_id === h.product_id).forEach(ing => {
+          if (ing.rm_price != null) baseCost += ing.quantity * ing.rm_price;
+          else allPriced = false;
+        });
+        SUB_RECIPES.filter(sr => sr.product_id === h.product_id).forEach(sr => {
+          const subOutputQty = parseFloat(sr.sub_output_qty);
+          if (!subOutputQty || subOutputQty <= 0) return;
+          const subQtyRatio = parseFloat(sr.quantity) / subOutputQty;
+          SUB_INGREDIENTS.filter(si => si.product_id === sr.sub_product_id).forEach(ing => {
+            if (ing.rm_price != null) baseCost += ing.quantity * subQtyRatio * ing.rm_price;
+            else allPriced = false;
+          });
+        });
+        const scaledRawCost   = baseCost * factor * lossMult;
+        const overhead        = parseFloat(h.overhead_pct) || 0;
+        const overheadAmt     = scaledRawCost * overhead / 100;
+        const scaledTotalCost = scaledRawCost + overheadAmt;
+        const wholesale       = h.wholesale != null ? parseFloat(h.wholesale) : null;
+        const discount        = parseFloat(h.discount) || 0;
+        const effWS           = wholesale != null ? wholesale / (1 + discount / 100) : null;
+        const totalIncome     = effWS != null ? effWS * sellablePcs : null;
+        const totalMargin     = totalIncome != null && allPriced ? totalIncome - scaledTotalCost : null;
+        const marginPc        = totalMargin != null && sellablePcs > 0 ? totalMargin / sellablePcs : null;
+        const marginPct       = totalMargin != null && totalIncome != null && totalIncome > 0 ? (totalMargin / totalIncome) * 100 : null;
+        summaryRows.push({
+          product_name: h.product_name, category: h.category || '',
+          subcategory: h.subcategory || '', scaled_output_qty: targetPcs,
+          sellablePcs, productionLoss, damagePct,
+          scaledTotalCost, overheadAmt, overhead,
+          totalIncome, totalMargin, marginPc, marginPct, allPriced, effWS
+        });
+      });
+
+      // Update print summary line
+      const ph = document.getElementById('printPlanSummary');
+      if (ph) ph.textContent = productLines.length ? 'Plan: ' + productLines.join(' | ') : '';
+
+      const rmItems = Object.values(aggregated).sort((a, b) => {
+        const c = (a.category || '').localeCompare(b.category || '');
+        return c !== 0 ? c : a.name.localeCompare(b.name);
+      });
+
+      _lastRMItems      = rmItems;
+      _lastSummaryRows  = summaryRows;
+
+      renderSummary(summaryRows);
+      renderResults(rmItems);
+    }
+
+    function renderSummary(rows) {
+      const card = document.getElementById('summaryCard');
+      const el   = document.getElementById('summaryContent');
+      if (rows.length === 0) { card.style.display = 'none'; return; }
+      card.style.display = '';
+
+      let grandCost = 0, grandOverhead = 0, grandIncome = 0, grandMargin = 0;
+      let anyMissing = false, lastCat = null;
+      let trows = '';
+
+      rows.forEach(r => {
+        if (r.category !== lastCat) {
+          lastCat = r.category;
+          trows += `<tr class="cat-group"><td colspan="12">${r.category || '(No Category)'}</td></tr>`;
+        }
+        const costCell   = r.allPriced ? `Rs. ${r.scaledTotalCost.toFixed(2)}` : `Rs. ${r.scaledTotalCost.toFixed(2)}<span class="missing-note"> *</span>`;
+        const ovhCell    = r.overhead > 0
+          ? `Rs. ${r.overheadAmt.toFixed(2)} <span style="color:#888;font-size:11px;">(${r.overhead}%)</span>`
+          : `<span style="color:#bbb;">—</span>`;
+        const lossCell   = r.productionLoss > 0 ? `<span style="color:#e65100;">${r.productionLoss}%</span>` : `<span style="color:#bbb;">—</span>`;
+        const dmgCell    = r.damagePct > 0
+          ? `<span style="color:#e65100;">${r.damagePct}%</span><br><span style="font-size:11px;color:#888;">${r.sellablePcs.toFixed(1)} sell</span>`
+          : `<span style="color:#bbb;">—</span>`;
+        const incCell    = r.totalIncome != null ? `<span style="color:#1976d2;">Rs. ${r.totalIncome.toFixed(2)}</span>` : '—';
+        const marCell    = r.totalMargin != null
+          ? `<span class="${r.totalMargin >= 0 ? 'positive' : 'negative'}">Rs. ${r.totalMargin.toFixed(2)}</span>` : '—';
+        const marPctCell = r.marginPct  != null
+          ? `<span class="${r.marginPct  >= 0 ? 'positive' : 'negative'}">${r.marginPct.toFixed(1)}%</span>`       : '—';
+        const mpcCell    = r.marginPc   != null
+          ? `<span class="${r.marginPc   >= 0 ? 'positive' : 'negative'}">Rs. ${r.marginPc.toFixed(2)}</span>`     : '—';
+
+        if (!r.allPriced) anyMissing = true;
+        grandCost    += r.scaledTotalCost;
+        grandOverhead += r.overheadAmt;
+        if (r.totalIncome != null) grandIncome += r.totalIncome;
+        if (r.totalMargin != null) grandMargin += r.totalMargin;
+
+        trows += `<tr>
+          <td>${r.product_name}</td>
+          <td>${r.subcategory || '—'}</td>
+          <td class="num">${r.scaled_output_qty}</td>
+          <td class="num">${lossCell}</td>
+          <td class="num">${dmgCell}</td>
+          <td class="num">${r.damagePct > 0 ? r.sellablePcs.toFixed(1) : r.scaled_output_qty}</td>
+          <td class="num">${costCell}</td>
+          <td class="num">${ovhCell}</td>
+          <td class="num">${incCell}</td>
+          <td class="num">${marCell}</td>
+          <td class="num">${marPctCell}</td>
+          <td class="num">${mpcCell}</td>
+        </tr>`;
+      });
+
+      const grandMarginPct = grandIncome > 0 ? (grandMargin / grandIncome) * 100 : null;
+      trows += `<tr class="total-row">
+        <td colspan="2" style="text-align:right;">Total</td>
+        <td></td><td></td><td></td><td></td>
+        <td class="num">Rs. ${grandCost.toFixed(2)}</td>
+        <td class="num">Rs. ${grandOverhead.toFixed(2)}</td>
+        <td class="num" style="color:#1976d2;">Rs. ${grandIncome.toFixed(2)}</td>
+        <td class="num"><span class="${grandMargin >= 0 ? 'positive' : 'negative'}">Rs. ${grandMargin.toFixed(2)}</span></td>
+        <td class="num">${grandMarginPct != null ? `<span class="${grandMarginPct >= 0 ? 'positive' : 'negative'}">${grandMarginPct.toFixed(1)}%</span>` : '—'}</td>
+        <td></td>
+      </tr>`;
+
+      el.innerHTML = `
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>Product</th><th>Sub-category</th>
+              <th class="num">Output (pcs)</th>
+              <th class="num">Loss %</th>
+              <th class="num">Return %</th>
+              <th class="num">Sellable (pcs)</th>
+              <th class="num">Total Cost (Rs.)</th>
+              <th class="num">Overhead (Rs.)</th>
+              <th class="num">Total Income (Rs.)</th>
+              <th class="num">Total Margin (Rs.)</th>
+              <th class="num">Margin %</th>
+              <th class="num">Margin / pc (Rs.)</th>
+            </tr>
+          </thead>
+          <tbody>${trows}</tbody>
+        </table>
+        ${anyMissing ? '<p style="padding:8px 14px;font-size:12px;color:#e65100;margin:0;">* Some ingredient prices are missing — cost may be understated.</p>' : ''}
+      `;
+    }
+
+    function renderResults(items) {
+      const el = document.getElementById('resultsContent');
+      if (items.length === 0) {
+        el.className = 'empty-result';
+        el.innerHTML = 'Enter quantities above to calculate required raw materials.';
+        return;
+      }
+      let grandCost = 0, anyMissing = false, lastCat = null, sn = 0;
+      let rows = '';
+      items.forEach(item => {
+        if (item.category !== lastCat) {
+          lastCat = item.category;
+          rows += `<tr class="cat-group"><td colspan="7">${item.category || '(No Category)'}</td></tr>`;
+        }
+        sn++;
+        const costCell = item.missingPrice ? `<span class="missing-note">price missing</span>` : `Rs. ${item.totalCost.toFixed(2)}`;
+        if (!item.missingPrice) grandCost += item.totalCost;
+        if (item.missingPrice) anyMissing = true;
+        rows += `<tr>
+          <td class="num">${sn}</td>
+          <td>${item.category || '—'}</td><td>${item.name}</td><td>${item.unit || '—'}</td>
+          <td class="num">${fmt(item.totalQty)}</td>
+          <td class="num">${item.price != null ? 'Rs. ' + parseFloat(item.price).toFixed(2) : '<span class="missing-note">—</span>'}</td>
+          <td class="num">${costCell}</td>
+        </tr>`;
+      });
+      rows += `<tr class="total-row">
+        <td colspan="4" style="text-align:right;">Grand Total Raw Material Cost:</td>
+        <td></td><td></td>
+        <td class="num">Rs. ${grandCost.toFixed(2)}${anyMissing ? '<span class="missing-note"> *</span>' : ''}</td>
+      </tr>`;
+      el.className = '';
+      el.innerHTML = `
+        <table class="result-table">
+          <thead><tr>
+            <th class="num">SN</th><th>Category</th><th>Raw Material</th><th>Unit</th>
+            <th class="num">Required Qty</th><th class="num">Price / Unit</th><th class="num">Total Cost (Rs.)</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        ${anyMissing ? '<p style="padding:8px 14px;font-size:12px;color:#e65100;margin:0;">* Some ingredient prices are missing — total may be understated.</p>' : ''}
+      `;
+    }
+
+    // --- Print individual section ---
+    function printSection(section) {
+      const plan    = document.getElementById('printPlanSummary');
+      const sumCard = document.getElementById('summaryCard');
+      const rmCard  = document.getElementById('resultsCard');
+
+      // Temporarily isolate the desired section for printing
+      const origSum = sumCard.style.display;
+      const origRM  = rmCard.style.display;
+
+      if (section === 'summary') { rmCard.style.display  = 'none'; }
+      if (section === 'rm')      { sumCard.style.display = 'none'; }
+
+      window.print();
+
+      sumCard.style.display = origSum;
+      rmCard.style.display  = origRM;
+    }
+
+    // --- CSV helpers ---
+    function toCSV(headers, rows) {
+      const escape = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      return [headers, ...rows].map(r => r.map(escape).join(',')).join('\r\n');
+    }
+
+    function downloadCSV(content, filename) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([content], { type: 'text/csv' }));
+      a.download = filename;
+      a.click();
+    }
+
+    async function exportExcel(btn) {
+      const scaleInputs = {};
+      document.querySelectorAll('.scale-input').forEach(el => {
+        const val = parseFloat(el.value);
+        if (!isNaN(val) && val > 0) scaleInputs[el.dataset.productId] = val;
+      });
+      if (!Object.keys(scaleInputs).length) {
+        alert('Enter at least one scale quantity before exporting.');
+        return;
+      }
+      const orig = btn.textContent;
+      btn.textContent = 'Generating…';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/admin/raw-material-receipt/export-excel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scaleInputs })
+        });
+        if (!res.ok) { alert('Export failed: ' + (await res.text())); return; }
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'raw-material-receipt.xlsx';
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Export error: ' + e.message);
+      } finally {
+        btn.textContent = orig;
+        btn.disabled = false;
+      }
+    }
+
+    function exportAllCSV() {
+      if (!_lastSummaryRows.length && !_lastRMItems.length) return;
+      const escape = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      const row = cols => cols.map(escape).join(',');
+      const lines = [];
+
+      // --- Production Summary ---
+      lines.push(row(['PRODUCTION SUMMARY']));
+      lines.push(row(['Product','Sub-category','Output (pcs)','Loss %','Return %','Sellable (pcs)','Total Cost (Rs.)','Overhead (Rs.)','Overhead %','Total Income (Rs.)','Total Margin (Rs.)','Margin %','Margin/pc (Rs.)']));
+      _lastSummaryRows.forEach(r => {
+        lines.push(row([
+          r.product_name, r.subcategory, r.scaled_output_qty,
+          r.productionLoss > 0 ? r.productionLoss + '%' : '',
+          r.damagePct > 0 ? r.damagePct + '%' : '',
+          r.damagePct > 0 ? r.sellablePcs.toFixed(1) : r.scaled_output_qty,
+          r.scaledTotalCost.toFixed(2),
+          r.overheadAmt.toFixed(2),
+          r.overhead,
+          r.totalIncome != null ? r.totalIncome.toFixed(2) : '',
+          r.totalMargin != null ? r.totalMargin.toFixed(2) : '',
+          r.marginPct   != null ? r.marginPct.toFixed(1) + '%' : '',
+          r.marginPc    != null ? r.marginPc.toFixed(2)  : ''
+        ]));
+      });
+
+      lines.push(''); // blank separator
+
+      // --- Raw Material Requirements ---
+      lines.push(row(['RAW MATERIAL REQUIREMENTS']));
+      lines.push(row(['SN','Category','Raw Material','Unit','Required Qty','Price/Unit (Rs.)','Total Cost (Rs.)']));
+      let sn = 0;
+      _lastRMItems.forEach(item => {
+        sn++;
+        lines.push(row([
+          sn, item.category, item.name, item.unit,
+          fmt(item.totalQty),
+          item.price != null ? parseFloat(item.price).toFixed(2) : '',
+          !item.missingPrice ? item.totalCost.toFixed(2) : ''
+        ]));
+      });
+
+      downloadCSV(lines.join('\r\n'), 'raw-material-receipt.csv');
+    }
+  </script>
+  <style>
+    .print-only { display: none; }
+    @media print { .print-only { display: block !important; } }
+  </style>
+</body>
+</html>

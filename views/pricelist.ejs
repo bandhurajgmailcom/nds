@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricelist - <%= companyName %></title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .pricelist-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+    .pricelist-toolbar input, .pricelist-toolbar select { padding: 8px 10px; border: 1px solid #c5cae9; border-radius: 6px; font-size: 14px; }
+    .pricelist-toolbar input[type="text"] { width: 140px; }
+    .btn-success { background: #2e7d32; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .btn-success:hover { background: #1b5e20; }
+    .btn-edit-sm { background: #1565c0; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .btn-edit-sm:hover { background: #0d47a1; }
+    .img-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+    .price-mrp { font-weight: 600; color: #1a237e; }
+    .price-ws { color: #555; }
+
+    /* Multi-select dropdown */
+    .multi-select { position: relative; display: inline-block; }
+    .ms-btn {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      padding: 8px 10px; border: 1px solid #c5cae9; border-radius: 6px;
+      font-size: 14px; background: #fff; cursor: pointer; min-width: 130px;
+      white-space: nowrap;
+    }
+    .ms-btn:hover { border-color: #9fa8da; background: #f8f8ff; }
+    .ms-btn.has-selection { border-color: #3949ab; background: #e8eaf6; }
+    .ms-arrow { font-size: 10px; color: #888; }
+    .ms-dropdown {
+      display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
+      background: #fff; border: 1px solid #c5cae9; border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15); min-width: 200px; max-height: 260px;
+      overflow-y: auto; padding: 6px 0;
+    }
+    .ms-dropdown.open { display: block; }
+    .ms-option {
+      display: flex; align-items: center; gap: 8px; padding: 7px 14px;
+      font-size: 13px; cursor: pointer; white-space: nowrap; color: #333;
+    }
+    .ms-option:hover { background: #f0f0ff; }
+    .ms-option.hidden { display: none; }
+    .ms-option input[type="checkbox"] { cursor: pointer; accent-color: #3949ab; }
+
+    /* Sortable headers */
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { background: #e8eaf6; }
+    th.sortable .sort-icon { font-size: 10px; margin-left: 4px; opacity: 0.35; }
+    th.sort-asc .sort-icon, th.sort-desc .sort-icon { opacity: 1; }
+    th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content: '⇅'; }
+    th.sort-asc .sort-icon::after { content: '▲'; }
+    th.sort-desc .sort-icon::after { content: '▼'; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: #fff; border-radius: 10px; padding: 28px 32px; width: 620px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+    .modal h3 { margin: 0 0 18px; color: #1a237e; font-size: 17px; }
+    .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal-grid .full { grid-column: 1 / -1; }
+    .modal-grid label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
+    .modal-grid input, .modal-grid textarea { width: 100%; padding: 7px 10px; border: 1px solid #c5cae9; border-radius: 5px; font-size: 14px; box-sizing: border-box; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+    .btn-cancel { background: #e0e0e0; color: #333; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <%- include('./partials/navbar') %>
+  <main class="main-content">
+    <div class="page-header">
+      <h2>🏷️ Pricelist</h2>
+    </div>
+
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+
+    <div class="card">
+      <div class="card-header-flex">
+        <!-- Search & Filter -->
+        <form method="GET" action="/pricelist" class="pricelist-toolbar" id="filterForm">
+          <!-- Category multi-select -->
+          <div class="multi-select" id="cat-ms">
+            <button type="button" class="ms-btn <%= selectedCategories.length ? 'has-selection' : '' %>" onclick="toggleMs('cat-ms')">
+              <span class="ms-label"><%=
+                selectedCategories.length === 0 ? 'All Categories' :
+                selectedCategories.length === 1 ? selectedCategories[0] :
+                selectedCategories.length + ' Categories'
+              %></span>
+              <span class="ms-arrow">▼</span>
+            </button>
+            <div class="ms-dropdown" id="cat-dropdown">
+              <% categories.forEach(c => { %>
+              <label class="ms-option">
+                <input type="checkbox" name="category" value="<%= c.CATEGORY %>"
+                  <%= selectedCategories.includes(c.CATEGORY) ? 'checked' : '' %>
+                  onchange="syncSubcatOptions(); updateMsLabel('cat-ms', 'All Categories', 'Categories')">
+                <%= c.CATEGORY %>
+              </label>
+              <% }) %>
+            </div>
+          </div>
+
+          <!-- Sub-category multi-select -->
+          <div class="multi-select" id="subcat-ms">
+            <button type="button" class="ms-btn <%= selectedSubcategories.length ? 'has-selection' : '' %>" onclick="toggleMs('subcat-ms')">
+              <span class="ms-label"><%=
+                selectedSubcategories.length === 0 ? 'All Sub-Cat' :
+                selectedSubcategories.length === 1 ? selectedSubcategories[0] :
+                selectedSubcategories.length + ' Sub-Cat'
+              %></span>
+              <span class="ms-arrow">▼</span>
+            </button>
+            <div class="ms-dropdown" id="subcat-dropdown">
+              <% (catSubcatPairs || []).forEach(pair => { %>
+              <label class="ms-option" data-cats="<%= pair.CATEGORY %>">
+                <input type="checkbox" name="subcategory" value="<%= pair.SUBCATEGORY %>"
+                  <%= selectedSubcategories.includes(pair.SUBCATEGORY) ? 'checked' : '' %>
+                  onchange="updateMsLabel('subcat-ms', 'All Sub-Cat', 'Sub-Cat')">
+                <span style="color:#888;font-size:11px;min-width:60px"><%= pair.CATEGORY %>:</span> <%= pair.SUBCATEGORY %>
+              </label>
+              <% }) %>
+            </div>
+          </div>
+
+          <!-- Product search -->
+          <input type="text" name="search" id="searchInput" placeholder="Product..." value="<%= search %>" autocomplete="off" list="product-suggestions">
+          <datalist id="product-suggestions"></datalist>
+
+          <!-- Unit multi-select -->
+          <div class="multi-select" id="unit-ms">
+            <button type="button" class="ms-btn <%= selectedUnits.length ? 'has-selection' : '' %>" onclick="toggleMs('unit-ms')">
+              <span class="ms-label"><%=
+                selectedUnits.length === 0 ? 'All Units' :
+                selectedUnits.length === 1 ? selectedUnits[0] :
+                selectedUnits.length + ' Units'
+              %></span>
+              <span class="ms-arrow">▼</span>
+            </button>
+            <div class="ms-dropdown" id="unit-dropdown">
+              <% (units || []).forEach(u => { %>
+              <label class="ms-option">
+                <input type="checkbox" name="unit" value="<%= u %>"
+                  <%= selectedUnits.includes(u) ? 'checked' : '' %>
+                  onchange="updateMsLabel('unit-ms', 'All Units', 'Units')">
+                <%= u %>
+              </label>
+              <% }) %>
+            </div>
+          </div>
+
+          <!-- Qty multi-select -->
+          <div class="multi-select" id="qty-ms">
+            <button type="button" class="ms-btn <%= selectedQtys.length ? 'has-selection' : '' %>" onclick="toggleMs('qty-ms')">
+              <span class="ms-label"><%=
+                selectedQtys.length === 0 ? 'All Qty' :
+                selectedQtys.length === 1 ? selectedQtys[0] :
+                selectedQtys.length + ' Qty'
+              %></span>
+              <span class="ms-arrow">▼</span>
+            </button>
+            <div class="ms-dropdown" id="qty-dropdown">
+              <% (qtys || []).forEach(q => { %>
+              <label class="ms-option">
+                <input type="checkbox" name="qty" value="<%= q %>"
+                  <%= selectedQtys.includes(q) ? 'checked' : '' %>
+                  onchange="updateMsLabel('qty-ms', 'All Qty', 'Qty')">
+                <%= q %>
+              </label>
+              <% }) %>
+            </div>
+          </div>
+
+          <select name="limit" onchange="this.form.submit()" title="Records to display">
+            <option value="25" <%= limit === 25 ? 'selected' : '' %>>Show 25</option>
+            <option value="50" <%= limit === 50 ? 'selected' : '' %>>Show 50</option>
+            <option value="100" <%= limit === 100 ? 'selected' : '' %>>Show 100</option>
+            <option value="0" <%= limit === 0 ? 'selected' : '' %>>Show All</option>
+          </select>
+          <input type="hidden" name="sortby" id="sortby" value="<%= sortby %>">
+          <input type="hidden" name="sortdir" id="sortdir" value="<%= sortdir %>">
+          <input type="hidden" name="page" id="formPage" value="1">
+          <button type="submit" class="btn-primary" style="padding:8px 16px;">Search</button>
+          <% if (search || selectedCategories.length || selectedSubcategories.length || selectedUnits.length || selectedQtys.length) { %>
+            <a href="/pricelist" class="btn-cancel" style="padding:8px 14px;border-radius:6px;text-decoration:none;">Clear</a>
+          <% } %>
+        </form>
+
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn-cancel" style="border-radius:6px;" onclick="downloadCsv()">⬇ Download CSV</button>
+          <% if (user.role === 'Administrator') { %>
+            <button class="btn-success" onclick="openAddModal()">+ Add Item</button>
+          <% } %>
+        </div>
+      </div>
+
+      <table class="data-table" id="priceTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th class="sortable <%= sortby==='CATEGORY'?(sortdir.toLowerCase()==='asc'?'sort-asc':'sort-desc'):'' %>" data-col="CATEGORY">Category <span class="sort-icon"></span></th>
+            <th class="sortable <%= sortby==='SUBCATEGORY'?(sortdir.toLowerCase()==='asc'?'sort-asc':'sort-desc'):'' %>" data-col="SUBCATEGORY">Sub-Category <span class="sort-icon"></span></th>
+            <th class="sortable <%= sortby==='PRODUCT'?(sortdir.toLowerCase()==='asc'?'sort-asc':'sort-desc'):'' %>" data-col="PRODUCT">Product <span class="sort-icon"></span></th>
+            <th class="sortable <%= sortby==='UNIT'?(sortdir.toLowerCase()==='asc'?'sort-asc':'sort-desc'):'' %>" data-col="UNIT">Unit <span class="sort-icon"></span></th>
+            <th class="sortable <%= sortby==='QTY'?(sortdir.toLowerCase()==='asc'?'sort-asc':'sort-desc'):'' %>" data-col="QTY">Qty <span class="sort-icon"></span></th>
+            <th class="sortable <%= sortby==='WHOLESALE'?(sortdir.toLowerCase()==='asc'?'sort-asc':'sort-desc'):'' %>" data-col="WHOLESALE">Wholesale <span class="sort-icon"></span></th>
+            <th class="sortable <%= sortby==='MRP'?(sortdir.toLowerCase()==='asc'?'sort-asc':'sort-desc'):'' %>" data-col="MRP">MRP <span class="sort-icon"></span></th>
+            <th>Image</th>
+            <% if (user.role === 'Administrator') { %>
+              <th>Actions</th>
+            <% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% items.forEach((item, i) => { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><%= item.CATEGORY || '-' %></td>
+            <td><%= item.SUBCATEGORY || '-' %></td>
+            <td><strong><%= item.PRODUCT || '-' %></strong><% if (item.DESCRIPTION) { %><br><small style="color:#888"><%= item.DESCRIPTION %></small><% } %></td>
+            <td><%= item.UNIT || '-' %></td>
+            <td><%= item.QTY || '-' %></td>
+            <td class="price-ws">Rs. <%= item.WHOLESALE || '-' %></td>
+            <td class="price-mrp">Rs. <%= item.MRP || '-' %></td>
+            <td>
+              <% if (item.URL) { %>
+                <img src="<%= item.URL %>" alt="" class="img-thumb" onerror="this.style.display='none'">
+              <% } else { %>-<% } %>
+            </td>
+            <% if (user.role === 'Administrator') { %>
+            <td style="white-space:nowrap">
+              <button class="btn-edit-sm" onclick="openEditModal(<%= JSON.stringify(item) %>)">Edit</button>
+              <form method="POST" action="/pricelist/delete/<%= item.ID %>" style="display:inline" onsubmit="return confirm('Delete this item?')">
+                <button class="btn-danger-sm">Delete</button>
+              </form>
+            </td>
+            <% } %>
+          </tr>
+          <% }) %>
+          <% if (items.length === 0) { %>
+            <tr><td colspan="10" class="empty">No items found.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+      <%
+        function pageUrl(targetPage) {
+          const p = new URLSearchParams();
+          if (search) p.append('search', search);
+          selectedCategories.forEach(c => p.append('category', c));
+          selectedSubcategories.forEach(s => p.append('subcategory', s));
+          selectedUnits.forEach(u => p.append('unit', u));
+          selectedQtys.forEach(q => p.append('qty', q));
+          if (limit !== 25) p.set('limit', limit);
+          if (sortby !== 'SN') p.set('sortby', sortby);
+          if (sortdir !== 'ASC') p.set('sortdir', sortdir);
+          p.set('page', targetPage);
+          return '/pricelist?' + p.toString();
+        }
+        const from = totalItems === 0 ? 0 : (page-1)*(limit>0?limit:totalItems)+1;
+        const to = Math.min(page*(limit>0?limit:totalItems), totalItems);
+      %>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap;gap:8px;">
+        <p style="color:#888;font-size:13px;margin:0;">Showing <%= from %>–<%= to %> of <%= totalItems %> item(s)</p>
+        <% if (totalPages > 1) { %>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <% if (page > 1) { %>
+            <a href="<%= pageUrl(page-1) %>" class="btn-cancel" style="padding:6px 14px;border-radius:6px;text-decoration:none;font-size:13px;">&#8592; Prev</a>
+          <% } %>
+          <span style="font-size:13px;color:#555;">Page <%= page %> of <%= totalPages %></span>
+          <% if (page < totalPages) { %>
+            <a href="<%= pageUrl(page+1) %>" class="btn-primary" style="padding:6px 14px;border-radius:6px;text-decoration:none;font-size:13px;">Next &#8594;</a>
+          <% } %>
+        </div>
+        <% } %>
+      </div>
+    </div>
+  </main>
+
+  <% if (user.role === 'Administrator') { %>
+  <!-- Add Modal -->
+  <div class="modal-overlay" id="addModal">
+    <div class="modal">
+      <h3>Add New Pricelist Item</h3>
+      <form method="POST" action="/pricelist/add">
+        <div class="modal-grid">
+          <div>
+            <label>SN</label>
+            <input type="text" name="SN" id="add_SN" readonly style="background:#f5f5f5;color:#888;cursor:not-allowed;">
+          </div>
+          <div>
+            <label>Product Name *</label>
+            <input type="text" name="PRODUCT" required>
+          </div>
+          <div>
+            <label>Category</label>
+            <input type="text" name="CATEGORY" id="add_CATEGORY" list="cat-list" autocomplete="off" oninput="updateSubcats('add_CATEGORY','add-subcat-list')">
+            <datalist id="cat-list">
+              <% categories.forEach(c => { %><option value="<%= c.CATEGORY %>"><% }) %>
+            </datalist>
+          </div>
+          <div>
+            <label>Sub-Category</label>
+            <input type="text" name="SUBCATEGORY" id="add_SUBCATEGORY" list="add-subcat-list" autocomplete="off">
+            <datalist id="add-subcat-list">
+              <% (subcategories || []).forEach(s => { %><option value="<%= s.SUBCATEGORY %>"><% }) %>
+            </datalist>
+          </div>
+          <div>
+            <label>Unit</label>
+            <input type="text" name="UNIT" id="add_UNIT" list="unit-list" autocomplete="off">
+          </div>
+          <div>
+            <label>Qty</label>
+            <input type="text" name="QTY">
+          </div>
+          <div>
+            <label>Wholesale (Rs.)</label>
+            <input type="text" inputmode="decimal" name="WHOLESALE" pattern="[0-9]*\.?[0-9]*" oninput="this.value=this.value.replace(/[^0-9.]/g,'')">
+          </div>
+          <div>
+            <label>MRP (Rs.)</label>
+            <input type="text" inputmode="decimal" name="MRP" pattern="[0-9]*\.?[0-9]*" oninput="this.value=this.value.replace(/[^0-9.]/g,'')">
+          </div>
+          <div>
+            <label>Barcode</label>
+            <input type="text" inputmode="numeric" name="BARCODE" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+          </div>
+          <div>
+            <label>Image URL</label>
+            <input type="text" name="URL">
+          </div>
+          <div class="full">
+            <label>Description</label>
+            <input type="text" name="DESCRIPTION" maxlength="100">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" onclick="closeModal('addModal')">Cancel</button>
+          <button type="submit" class="btn-success">Add Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h3>Edit Pricelist Item</h3>
+      <form method="POST" id="editForm" action="">
+        <div class="modal-grid">
+          <div>
+            <label>SN</label>
+            <input type="number" name="SN" id="edit_SN">
+          </div>
+          <div>
+            <label>Product Name *</label>
+            <input type="text" name="PRODUCT" id="edit_PRODUCT" required>
+          </div>
+          <div>
+            <label>Category</label>
+            <input type="text" name="CATEGORY" id="edit_CATEGORY" list="cat-list" autocomplete="off" oninput="updateSubcats('edit_CATEGORY','edit-subcat-list')">
+          </div>
+          <div>
+            <label>Sub-Category</label>
+            <input type="text" name="SUBCATEGORY" id="edit_SUBCATEGORY" list="edit-subcat-list" autocomplete="off">
+            <datalist id="edit-subcat-list">
+              <% (subcategories || []).forEach(s => { %><option value="<%= s.SUBCATEGORY %>"><% }) %>
+            </datalist>
+          </div>
+          <div>
+            <label>Unit</label>
+            <input type="text" name="UNIT" id="edit_UNIT" list="unit-list" autocomplete="off">
+          </div>
+          <div>
+            <label>Qty</label>
+            <input type="text" name="QTY" id="edit_QTY">
+          </div>
+          <div>
+            <label>Wholesale (Rs.)</label>
+            <input type="number" step="0.01" name="WHOLESALE" id="edit_WHOLESALE">
+          </div>
+          <div>
+            <label>MRP (Rs.)</label>
+            <input type="number" step="0.01" name="MRP" id="edit_MRP">
+          </div>
+          <div>
+            <label>Barcode</label>
+            <input type="number" name="BARCODE" id="edit_BARCODE">
+          </div>
+          <div>
+            <label>Image URL</label>
+            <input type="text" name="URL" id="edit_URL">
+          </div>
+          <div class="full">
+            <label>Description</label>
+            <input type="text" name="DESCRIPTION" id="edit_DESCRIPTION" maxlength="100">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" onclick="closeModal('editModal')">Cancel</button>
+          <button type="submit" class="btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Shared datalist for Unit -->
+  <datalist id="unit-list">
+    <% (locals.units || []).forEach(u => { %><option value="<%= u %>"><% }) %>
+  </datalist>
+  <% } %>
+
+  <script>
+    const catSubcatMap = <%- JSON.stringify(catSubcatMap) %>;
+
+    // ---- Multi-select logic ----
+    function toggleMs(id) {
+      const wrapper = document.getElementById(id);
+      const dropdown = wrapper.querySelector('.ms-dropdown');
+      const isOpen = dropdown.classList.contains('open');
+      document.querySelectorAll('.ms-dropdown.open').forEach(d => d.classList.remove('open'));
+      if (!isOpen) dropdown.classList.add('open');
+    }
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.multi-select')) {
+        document.querySelectorAll('.ms-dropdown.open').forEach(d => d.classList.remove('open'));
+      }
+    });
+
+    function updateMsLabel(wrapperId, allLabel, pluralLabel) {
+      const wrapper = document.getElementById(wrapperId);
+      const checked = wrapper.querySelectorAll('input:checked');
+      const label = wrapper.querySelector('.ms-label');
+      const btn = wrapper.querySelector('.ms-btn');
+      if (checked.length === 0) {
+        label.textContent = allLabel;
+        btn.classList.remove('has-selection');
+      } else if (checked.length === 1) {
+        label.textContent = checked[0].value;
+        btn.classList.add('has-selection');
+      } else {
+        label.textContent = checked.length + ' ' + pluralLabel;
+        btn.classList.add('has-selection');
+      }
+    }
+
+    function syncSubcatOptions() {
+      updateMsLabel('cat-ms', 'All Categories', 'Categories');
+      const selectedCats = Array.from(document.querySelectorAll('#cat-dropdown input:checked')).map(cb => cb.value);
+      document.querySelectorAll('#subcat-dropdown .ms-option').forEach(opt => {
+        const cats = (opt.getAttribute('data-cats') || '').split('|').filter(Boolean);
+        const visible = selectedCats.length === 0 || selectedCats.some(c => cats.includes(c));
+        opt.classList.toggle('hidden', !visible);
+        if (!visible) opt.querySelector('input').checked = false;
+      });
+      updateMsLabel('subcat-ms', 'All Sub-Cat', 'Sub-Cat');
+    }
+
+    // Sync on load to apply pre-selected filters
+    syncSubcatOptions();
+
+    // ---- Product search autocomplete ----
+    let suggestTimer;
+    document.getElementById('searchInput').addEventListener('input', function() {
+      clearTimeout(suggestTimer);
+      const q = this.value.trim();
+      const list = document.getElementById('product-suggestions');
+      if (q.length < 2) { list.innerHTML = ''; return; }
+      suggestTimer = setTimeout(() => {
+        fetch('/pricelist/suggest?q=' + encodeURIComponent(q))
+          .then(r => r.json())
+          .then(names => {
+            list.innerHTML = names.map(n => `<option value="${n}">`).join('');
+          })
+          .catch(() => {});
+      }, 200);
+    });
+
+    // ---- CSV export (preserves current filters/sort) ----
+    function downloadCsv() {
+      const form = document.getElementById('filterForm');
+      const params = new URLSearchParams(new FormData(form));
+      params.delete('page');
+      params.delete('limit');
+      window.location.href = '/pricelist/export.csv?' + params.toString();
+    }
+
+    // ---- Column sort (server-side) ----
+    const currentSortby = document.getElementById('sortby').value;
+    const currentSortdir = document.getElementById('sortdir').value;
+
+    document.querySelectorAll('th.sortable').forEach(th => {
+      th.addEventListener('click', function() {
+        const col = this.dataset.col;
+        const newDir = (currentSortby === col && currentSortdir.toLowerCase() === 'asc') ? 'desc' : 'asc';
+        document.getElementById('sortby').value = col;
+        document.getElementById('sortdir').value = newDir;
+        document.getElementById('filterForm').submit();
+      });
+    });
+
+    <% if (user.role === 'Administrator') { %>
+    // ---- Modal logic ----
+    function updateSubcats(catInputId, datalistId) {
+      const cat = document.getElementById(catInputId).value.trim();
+      const list = document.getElementById(datalistId);
+      const subcats = catSubcatMap[cat] || [];
+      if (subcats.length > 0) {
+        list.innerHTML = subcats.map(s => `<option value="${s}">`).join('');
+      } else {
+        list.innerHTML = Object.values(catSubcatMap).flat()
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .map(s => `<option value="${s}">`).join('');
+      }
+    }
+
+    function openAddModal() {
+      fetch('/pricelist/next-sn')
+        .then(r => r.json())
+        .then(data => { document.getElementById('add_SN').value = data.nextSN; })
+        .catch(() => {});
+      document.getElementById('addModal').classList.add('active');
+    }
+    function openEditModal(item) {
+      document.getElementById('edit_SN').value = item.SN || '';
+      document.getElementById('edit_PRODUCT').value = item.PRODUCT || '';
+      document.getElementById('edit_CATEGORY').value = item.CATEGORY || '';
+      document.getElementById('edit_SUBCATEGORY').value = item.SUBCATEGORY || '';
+      document.getElementById('edit_UNIT').value = item.UNIT || '';
+      document.getElementById('edit_QTY').value = item.QTY || '';
+      document.getElementById('edit_WHOLESALE').value = item.WHOLESALE || '';
+      document.getElementById('edit_MRP').value = item.MRP || '';
+      document.getElementById('edit_BARCODE').value = item.BARCODE || '';
+      document.getElementById('edit_URL').value = item.URL || '';
+      document.getElementById('edit_DESCRIPTION').value = item.DESCRIPTION || '';
+      document.getElementById('editForm').action = '/pricelist/edit/' + item.ID;
+      updateSubcats('edit_CATEGORY', 'edit-subcat-list');
+      document.getElementById('editModal').classList.add('active');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+    document.querySelectorAll('.modal-overlay').forEach(el => {
+      el.addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('active');
+      });
+    });
+    <% } %>
+  </script>
+
+  <script src="/nepali-calendar.js"></script>
+</body>
+</html>

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendar - <%= companyName %></title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    /* ── Layout ── */
+    .cal-layout {
+      display: grid;
+      grid-template-columns: 1fr 310px;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .cal-layout { grid-template-columns: 1fr; }
+    }
+
+    /* ── Calendar header ── */
+    .cal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+    .cal-nav-group { display: flex; gap: 4px; }
+    .cal-nav-btn {
+      background: #e8eaf6;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 15px;
+      cursor: pointer;
+      color: #1a237e;
+      transition: background 0.15s;
+      font-weight: 700;
+    }
+    .cal-nav-btn:hover { background: #c5cae9; }
+    .cal-title-block { text-align: center; flex: 1; }
+    .cal-bs-title  { font-size: 20px; font-weight: 700; color: #1a237e; }
+    .cal-ad-title  { font-size: 13px; color: #888; margin-top: 2px; }
+
+    /* ── Quick selectors ── */
+    .cal-sel-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      justify-content: center;
+    }
+    .cal-sel-row select {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .cal-sel-row select:focus { outline: none; border-color: #3f51b5; }
+
+    /* ── Calendar grid ── */
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+    .cal-wh {
+      text-align: center;
+      padding: 6px 2px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #7986cb;
+      border-bottom: 2px solid #e8eaf6;
+    }
+    .cal-wh .wh-np  { display: block; font-size: 13px; color: #3f51b5; }
+    .cal-wh .wh-en  { display: block; font-size: 10px; color: #aaa; }
+    .cal-wh.sunday  { color: #e53935; }
+    .cal-wh.sunday .wh-np { color: #e53935; }
+    .cal-wh.saturday { color: #1565c0; }
+    .cal-wh.saturday .wh-np { color: #1565c0; }
+
+    .cal-cell {
+      border-radius: 7px;
+      padding: 5px 3px 4px;
+      min-height: 54px;
+      text-align: center;
+      cursor: default;
+      transition: background 0.12s;
+      border: 1px solid transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+    .cal-cell:hover { background: #f0f2ff; border-color: #c5cae9; }
+    .cal-cell.today {
+      background: #1a237e;
+      border-color: #1a237e;
+    }
+    .cal-cell.today .bs-d  { color: #fff; }
+    .cal-cell.today .ad-d  { color: rgba(255,255,255,0.75); }
+    .cal-cell.today .bs-d-small { color: rgba(255,255,255,0.6); }
+    .cal-cell.sunday  .bs-d { color: #e53935; }
+    .cal-cell.saturday .bs-d { color: #1565c0; }
+    .cal-cell.today.sunday .bs-d,
+    .cal-cell.today.saturday .bs-d { color: #fff; }
+
+    .bs-d       { font-size: 18px; font-weight: 700; color: #1a237e; line-height: 1; }
+    .ad-d       { font-size: 11px; color: #888; line-height: 1; }
+    .ad-d.month-change { color: #5c6bc0; font-weight: 600; }
+    .cell-note {
+      display: block;
+      font-size: 9px;
+      color: #2e7d32;
+      background: #e8f5e9;
+      border-radius: 3px;
+      padding: 1px 3px;
+      max-width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+      cursor: pointer;
+    }
+    .cal-cell.today .cell-note { background: rgba(255,255,255,0.2); color: #c8e6c9; }
+
+    /* ── Note editor panel ── */
+    .note-panel {
+      margin-top: 12px;
+      padding: 12px 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      border-left: 3px solid #3f51b5;
+      display: none;
+    }
+    .note-panel.visible { display: block; }
+    .note-panel-title { font-size: 12px; font-weight: 700; color: #555; margin-bottom: 8px; }
+    .note-panel-row { display: flex; gap: 8px; align-items: center; }
+    .note-panel-row input {
+      flex: 1;
+      padding: 7px 9px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .note-panel-row input:focus { outline: none; border-color: #3f51b5; }
+    .note-char-count { font-size: 11px; color: #aaa; white-space: nowrap; }
+    .note-save-btn {
+      background: #3f51b5; color: #fff; border: none;
+      border-radius: 6px; padding: 7px 14px; font-size: 13px;
+      cursor: pointer; white-space: nowrap;
+    }
+    .note-save-btn:hover { background: #303f9f; }
+    .note-del-btn {
+      background: #eee; color: #e53935; border: none;
+      border-radius: 6px; padding: 7px 10px; font-size: 13px;
+      cursor: pointer;
+    }
+    .note-del-btn:hover { background: #ffcdd2; }
+
+    /* ── Notes table ── */
+    .notes-table-wrap { margin-top: 16px; }
+    .notes-table-wrap h4 { font-size: 13px; font-weight: 700; color: #555; margin-bottom: 8px; }
+    .notes-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .notes-table th {
+      text-align: left; padding: 6px 8px;
+      background: #e8eaf6; color: #1a237e;
+      font-weight: 700; border-bottom: 2px solid #c5cae9;
+    }
+    .notes-table td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; }
+    .notes-table tr:last-child td { border-bottom: none; }
+    .notes-table tr:hover td { background: #f5f5f5; cursor: pointer; }
+    .notes-empty { font-size: 13px; color: #aaa; font-style: italic; margin-top: 8px; }
+
+    /* ── Converter sidebar ── */
+    .conv-section {
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #e8eaf6;
+    }
+    .conv-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+    .conv-section h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .conv-fields { display: flex; flex-direction: column; gap: 8px; }
+    .conv-field  { display: flex; flex-direction: column; gap: 4px; }
+    .conv-field label { font-size: 11px; font-weight: 600; color: #888; }
+    .conv-field select,
+    .conv-field input {
+      padding: 7px 9px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      width: 100%;
+    }
+    .conv-field select:focus,
+    .conv-field input:focus { outline: none; border-color: #3f51b5; }
+    .conv-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+    .conv-result {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #e8eaf6;
+      border-radius: 7px;
+      border-left: 3px solid #1a237e;
+      min-height: 48px;
+    }
+    .conv-result .r-main { font-size: 16px; font-weight: 700; color: #1a237e; }
+    .conv-result .r-sub  { font-size: 12px; color: #666; margin-top: 3px; }
+    .conv-result .r-empty { color: #aaa; font-size: 13px; font-style: italic; }
+
+    .today-link {
+      font-size: 11px; color: #3f51b5; cursor: pointer;
+      background: none; border: none; text-decoration: underline; margin-top: 4px;
+    }
+
+    /* ── Legend ── */
+    .cal-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #888;
+      flex-wrap: wrap;
+    }
+    .cal-legend span { display: flex; align-items: center; gap: 5px; }
+    .leg-dot {
+      width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <%- include('./partials/navbar') %>
+  <main class="main-content">
+    <div class="page-header">
+      <h2>📅 Calendar &nbsp;<small style="font-size:14px;color:#888">BS / AD</small></h2>
+      <div id="nepaliDate"></div>
+    </div>
+
+    <div class="cal-layout">
+
+      <!-- ══ LEFT: Calendar ══ -->
+      <div class="card" style="padding-bottom:16px">
+
+        <!-- Navigation -->
+        <div class="cal-header">
+          <div class="cal-nav-group">
+            <button class="cal-nav-btn" id="py" title="Previous Year">«</button>
+            <button class="cal-nav-btn" id="pm" title="Previous Month">‹</button>
+          </div>
+          <div class="cal-title-block">
+            <div class="cal-bs-title" id="calBsTitle">—</div>
+            <div class="cal-ad-title"  id="calAdTitle">—</div>
+          </div>
+          <div class="cal-nav-group">
+            <button class="cal-nav-btn" id="nm" title="Next Month">›</button>
+            <button class="cal-nav-btn" id="ny" title="Next Year">»</button>
+          </div>
+        </div>
+
+        <!-- Quick selectors -->
+        <div class="cal-sel-row">
+          <select id="calYear"></select>
+          <select id="calMonth"></select>
+        </div>
+
+        <!-- Grid -->
+        <div class="cal-grid" id="calGrid"></div>
+
+        <!-- Legend -->
+        <div class="cal-legend">
+          <span><span class="leg-dot" style="background:#1a237e"></span> Today</span>
+          <span><span class="leg-dot" style="background:#e53935"></span> Sunday</span>
+          <span><span class="leg-dot" style="background:#1565c0"></span> Saturday</span>
+          <span><span style="font-size:10px;background:#e8f5e9;color:#2e7d32;border-radius:3px;padding:1px 4px">note</span> Has note</span>
+        </div>
+
+        <!-- Note editor panel -->
+        <div class="note-panel" id="notePanel">
+          <div class="note-panel-title" id="notePanelTitle">Note for —</div>
+          <div class="note-panel-row">
+            <input type="text" id="noteInput" maxlength="25" placeholder="Add a note (max 25 chars)…">
+            <span class="note-char-count"><span id="noteCharLeft">25</span> left</span>
+            <button class="note-del-btn" id="noteDelBtn" title="Delete note">✕</button>
+            <button class="note-save-btn" id="noteSaveBtn">Save</button>
+          </div>
+        </div>
+
+        <!-- Notes table for current month -->
+        <div class="notes-table-wrap" id="notesTableWrap"></div>
+      </div>
+
+      <!-- ══ RIGHT: Date Converter ══ -->
+      <div class="card">
+        <h3 style="margin-bottom:18px">🔄 Date Converter</h3>
+
+        <!-- BS → AD -->
+        <div class="conv-section">
+          <h4>🗓 Nepali → English &nbsp;<small style="color:#aaa;font-weight:400">(BS → AD)</small></h4>
+          <div class="conv-fields">
+            <div class="conv-field">
+              <label>BS Year (वर्ष)</label>
+              <select id="c-bs-year"></select>
+            </div>
+            <div class="conv-row-2">
+              <div class="conv-field">
+                <label>Month (महिना)</label>
+                <select id="c-bs-month"></select>
+              </div>
+              <div class="conv-field">
+                <label>Day (गते)</label>
+                <select id="c-bs-day"></select>
+              </div>
+            </div>
+          </div>
+          <div class="conv-result" id="res-bs2ad">
+            <div class="r-empty">Select a BS date</div>
+          </div>
+          <button class="today-link" id="btn-bs-today">Use today's BS date</button>
+        </div>
+
+        <!-- AD → BS -->
+        <div class="conv-section">
+          <h4>📆 English → Nepali &nbsp;<small style="color:#aaa;font-weight:400">(AD → BS)</small></h4>
+          <div class="conv-fields">
+            <div class="conv-field">
+              <label>AD Date</label>
+              <input type="date" id="c-ad-input">
+            </div>
+          </div>
+          <div class="conv-result" id="res-ad2bs">
+            <div class="r-empty">Select an AD date</div>
+          </div>
+          <button class="today-link" id="btn-ad-today">Use today's AD date</button>
+        </div>
+      </div>
+
+    </div><!-- /.cal-layout -->
+  </main>
+
+  <script src="/nepali-calendar.js"></script>
+  <script>
+  (function () {
+    const M_NP = ['बैशाख','जेठ','असार','साउन','भदौ','असोज','कात्तिक','मंसिर','पुष','माघ','फागुन','चैत'];
+    const M_EN = ['Baishakh','Jestha','Ashadh','Shrawan','Bhadra','Ashwin','Kartik','Mangsir','Poush','Magh','Falgun','Chaitra'];
+    const W_NP = ['आइत','सोम','मंगल','बुध','बिही','शुक्र','शनि'];
+    const W_EN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const AD_M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    let CAL = {
+      2075:[31,32,31,32,31,30,30,29,30,29,30,30],
+      2076:[31,32,31,32,31,30,30,30,29,29,30,30],
+      2077:[31,32,31,31,31,30,30,29,30,29,30,30],
+      2078:[31,31,32,31,31,31,30,30,29,30,29,31],
+      2079:[31,32,31,32,31,30,30,30,29,29,30,30],
+      2080:[31,32,31,32,31,30,30,30,29,29,30,30],
+      2081:[31,31,32,31,31,31,30,29,30,29,30,30],
+      2082:[31,32,31,32,31,30,30,30,29,30,30,30],
+      2083:[31,31,32,32,31,30,30,30,29,30,30,30],
+      2084:[31,31,32,32,31,30,30,30,29,30,30,30],
+      2085:[31,32,31,32,31,30,30,29,30,29,30,30],
+      2086:[31,32,31,32,31,30,30,30,29,29,30,31],
+    };
+
+    const REF = new Date(2021, 3, 14); // 14 Apr 2021 = 1 Baishakh 2078
+
+    fetch('/api/nepalical').then(r=>r.json()).then(d=>{
+      if(d && Object.keys(d).length){ Object.assign(CAL, d); refreshAll(); }
+    }).catch(()=>{});
+
+    function md(y,m){ return (CAL[y]&&CAL[y][m]!=null)?CAL[y][m]:[31,31,32,32,31,30,30,29,30,29,30,30][m]; }
+
+    function bsToAd(bY,bM,bD){
+      const RY=2078,RM=0,RD=1;
+      const cmp=bY!==RY?bY-RY:bM!==RM?bM-RM:bD-RD;
+      if(!cmp) return new Date(REF);
+      let days=0;
+      if(cmp>0){
+        let y=RY,m=RM,d=RD;
+        if(y===bY&&m===bM){days=bD-d;}
+        else{days=md(y,m)-d+1;if(++m>=12){m=0;y++;}while(!(y===bY&&m===bM)){days+=md(y,m);if(++m>=12){m=0;y++;}}days+=bD-1;}
+        return new Date(REF.getTime()+days*86400000);
+      } else {
+        let y=bY,m=bM,d=bD;
+        if(y===RY&&m===RM){days=RD-d;}
+        else{days=md(y,m)-d+1;if(++m>=12){m=0;y++;}while(!(y===RY&&m===RM)){days+=md(y,m);if(++m>=12){m=0;y++;}}days+=RD-1;}
+        return new Date(REF.getTime()-days*86400000);
+      }
+    }
+
+    function adToBs(ad){
+      const diff=Math.round((ad-REF)/86400000);
+      let y=2078,m=0,d=1,r=diff;
+      if(r>=0){while(r>0){const total=md(y,m),left=total-d+1;if(r>=left){r-=left;d=1;if(++m>=12){m=0;y++;}}else{d+=r;r=0;}}}
+      else{r=-r;while(r>0){if(r>=d){r-=d;if(--m<0){m=11;y--;}d=md(y,m);}else{d-=r;r=0;}}}
+      return {year:y,month:m,day:d};
+    }
+
+    function toNp(n){ return String(n).replace(/\d/g,c=>'०१२३४५६७८९'[c]); }
+    function pad2(n){ return n<10?'0'+n:''+n; }
+    function fmtAD(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+
+    // ── Notes state ──
+    let notesMap = {};        // bs_date -> note text
+    let selectedBsDate = null;
+
+    function bsDateKey(y, m, d) {
+      return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    }
+
+    function loadNotes(y, m) {
+      fetch(`/api/calendar-notes?year=${y}&month=${m+1}`)
+        .then(r => r.ok ? r.json() : {})
+        .then(data => { notesMap = (data && !data.error) ? data : {}; })
+        .catch(() => { notesMap = {}; })
+        .finally(() => { renderCalendar(); renderNotesTable(); });
+    }
+
+    function renderNotesTable() {
+      const wrap = document.getElementById('notesTableWrap');
+      const entries = Object.entries(notesMap).sort((a,b) => a[0].localeCompare(b[0]));
+      if (!entries.length) {
+        wrap.innerHTML = '<div class="notes-empty">No notes for this month.</div>';
+        return;
+      }
+      let html = '<h4>📝 Notes this month</h4><table class="notes-table"><thead><tr><th>BS Date</th><th>AD Date</th><th>Note</th></tr></thead><tbody>';
+      entries.forEach(([key, note]) => {
+        const [y, mStr, d] = key.split('-');
+        const bsM = parseInt(mStr) - 1;
+        const ad = bsToAd(+y, bsM, +d);
+        const adStr = AD_M[ad.getMonth()] + ' ' + ad.getDate() + ', ' + ad.getFullYear();
+        const bsLabel = toNp(+d) + ' ' + M_NP[bsM] + ' ' + toNp(+y);
+        html += `<tr data-bs="${key}"><td>${bsLabel}</td><td>${adStr}</td><td>${note}</td></tr>`;
+      });
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+      wrap.querySelectorAll('tr[data-bs]').forEach(tr => {
+        tr.addEventListener('click', () => openNotePanel(tr.dataset.bs));
+      });
+    }
+
+    function openNotePanel(bsDateStr) {
+      selectedBsDate = bsDateStr;
+      const [y, mStr, d] = bsDateStr.split('-');
+      const bsM = parseInt(mStr) - 1;
+      const bsLabel = toNp(+d) + ' ' + M_NP[bsM] + ' ' + toNp(+y);
+      document.getElementById('notePanelTitle').textContent = 'Note for ' + bsLabel;
+      const inp = document.getElementById('noteInput');
+      inp.value = notesMap[bsDateStr] || '';
+      document.getElementById('noteCharLeft').textContent = 25 - inp.value.length;
+      const panel = document.getElementById('notePanel');
+      panel.classList.add('visible');
+      inp.focus();
+    }
+
+    document.getElementById('noteInput').addEventListener('input', function() {
+      document.getElementById('noteCharLeft').textContent = 25 - this.value.length;
+    });
+
+    document.getElementById('noteSaveBtn').addEventListener('click', saveNote);
+    document.getElementById('noteInput').addEventListener('keydown', e => { if (e.key === 'Enter') saveNote(); });
+    document.getElementById('noteDelBtn').addEventListener('click', () => {
+      if (!selectedBsDate) return;
+      fetch('/api/calendar-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bs_date: selectedBsDate, note: '' })
+      })
+      .then(r => {
+        if (r.status === 401) { alert('Session expired. Please log in again.'); window.location='/login'; return; }
+        delete notesMap[selectedBsDate];
+        document.getElementById('notePanel').classList.remove('visible');
+        selectedBsDate = null;
+        renderCalendar();
+        renderNotesTable();
+      })
+      .catch(err => { alert('Could not delete note: ' + err.message); });
+    });
+
+    function saveNote() {
+      if (!selectedBsDate) return;
+      const note = document.getElementById('noteInput').value.slice(0, 25);
+      const btn = document.getElementById('noteSaveBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      fetch('/api/calendar-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bs_date: selectedBsDate, note })
+      })
+      .then(r => {
+        if (r.status === 401) { alert('Session expired. Please log in again.'); window.location='/login'; return null; }
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        return r.json();
+      })
+      .then(res => {
+        if (!res) return;
+        if (res.deleted) { delete notesMap[selectedBsDate]; }
+        else { notesMap[selectedBsDate] = note; }
+        document.getElementById('notePanel').classList.remove('visible');
+        selectedBsDate = null;
+        renderCalendar();
+        renderNotesTable();
+      })
+      .catch(err => { alert('Could not save note: ' + err.message); })
+      .finally(() => { btn.disabled = false; btn.textContent = 'Save'; });
+    }
+
+    // ── View state ──
+    const todayAD = new Date();
+    const todayBS = adToBs(todayAD);
+    let viewY = todayBS.year;
+    let viewM = todayBS.month;
+
+    // ── Populate year/month selects in calendar header ──
+    function populateCalSelects(){
+      const yEl = document.getElementById('calYear');
+      const mEl = document.getElementById('calMonth');
+      yEl.innerHTML = Object.keys(CAL).sort((a,b)=>a-b)
+        .map(y=>`<option value="${y}"${+y===viewY?' selected':''}>${y} BS</option>`).join('');
+      mEl.innerHTML = M_NP.map((n,i)=>`<option value="${i}"${i===viewM?' selected':''}>${n} / ${M_EN[i]}</option>`).join('');
+    }
+
+    // ── Render calendar grid ──
+    function renderCalendar(){
+      const y = viewY, m = viewM;
+      const dim = md(y, m);
+      const firstAD = bsToAd(y, m, 1);
+      const lastAD  = bsToAd(y, m, dim);
+      const dow = firstAD.getDay(); // 0=Sun
+
+      // Header titles
+      document.getElementById('calBsTitle').textContent = M_NP[m] + ' ' + toNp(y) + ' (' + M_EN[m] + ' ' + y + ' BS)';
+      const adSpan = firstAD.getMonth()===lastAD.getMonth()
+        ? AD_M[firstAD.getMonth()] + ' ' + firstAD.getFullYear()
+        : AD_M[firstAD.getMonth()] + ' – ' + AD_M[lastAD.getMonth()] + ' ' + lastAD.getFullYear();
+      document.getElementById('calAdTitle').textContent = 'AD: ' + adSpan;
+
+      // Sync selects
+      document.getElementById('calYear').value  = y;
+      document.getElementById('calMonth').value = m;
+
+      // Build grid
+      const grid = document.getElementById('calGrid');
+      let html = '';
+
+      // Week headers
+      for(let i=0;i<7;i++){
+        const cls = i===0?'sunday':i===6?'saturday':'';
+        html += `<div class="cal-wh ${cls}"><span class="wh-np">${W_NP[i]}</span><span class="wh-en">${W_EN[i]}</span></div>`;
+      }
+
+      // Empty leading cells
+      for(let i=0;i<dow;i++) html += '<div></div>';
+
+      // Day cells
+      let prevAdMonth = firstAD.getMonth();
+      for(let d=1;d<=dim;d++){
+        const ad = bsToAd(y, m, d);
+        const isToday = (y===todayBS.year && m===todayBS.month && d===todayBS.day);
+        const col = (dow + d - 1) % 7; // 0=Sun,6=Sat
+        const isSun = col===0, isSat = col===6;
+
+        const adMonth = ad.getMonth();
+        const monthChanged = adMonth !== prevAdMonth;
+        const adLabel = (d===1 || monthChanged)
+          ? AD_M[adMonth]+' '+ad.getDate()
+          : ''+ad.getDate();
+        const adCls = monthChanged ? 'ad-d month-change' : 'ad-d';
+        prevAdMonth = adMonth;
+
+        const cls = [
+          'cal-cell',
+          isToday ? 'today' : '',
+          isSun   ? 'sunday' : '',
+          isSat   ? 'saturday' : '',
+        ].filter(Boolean).join(' ');
+
+        const bsKey = bsDateKey(y, m, d);
+        const noteText = notesMap[bsKey] || '';
+        const notePreview = noteText.length > 7 ? noteText.slice(0, 6) + '…' : noteText;
+        const noteHtml = noteText
+          ? `<span class="cell-note" title="${noteText.replace(/"/g,'&quot;')}">${notePreview}</span>`
+          : '';
+        html += `<div class="${cls}" data-bs="${bsKey}" style="cursor:pointer">
+          <span class="bs-d">${toNp(d)}</span>
+          <span class="${adCls}">${adLabel}</span>
+          ${noteHtml}
+        </div>`;
+      }
+
+      grid.innerHTML = html;
+
+      // Attach click listeners to day cells
+      grid.querySelectorAll('.cal-cell[data-bs]').forEach(cell => {
+        cell.addEventListener('click', () => openNotePanel(cell.dataset.bs));
+      });
+    }
+
+    function refreshAll(){
+      populateCalSelects();
+      loadNotes(viewY, viewM);   // loads notes then calls renderCalendar + renderNotesTable
+    }
+
+    // ── Calendar navigation ──
+    function navMonth(delta){
+      viewM += delta;
+      if(viewM<0){viewM=11; viewY--;}
+      if(viewM>11){viewM=0; viewY++;}
+      document.getElementById('notePanel').classList.remove('visible');
+      document.getElementById('calYear').value  = viewY;
+      document.getElementById('calMonth').value = viewM;
+      loadNotes(viewY, viewM);
+    }
+
+    document.getElementById('pm').onclick = ()=>navMonth(-1);
+    document.getElementById('nm').onclick = ()=>navMonth(1);
+    document.getElementById('py').onclick = ()=>{ viewY--; document.getElementById('notePanel').classList.remove('visible'); document.getElementById('calYear').value=viewY; loadNotes(viewY, viewM); };
+    document.getElementById('ny').onclick = ()=>{ viewY++; document.getElementById('notePanel').classList.remove('visible'); document.getElementById('calYear').value=viewY; loadNotes(viewY, viewM); };
+    document.getElementById('calYear').onchange  = function(){ viewY=+this.value; document.getElementById('notePanel').classList.remove('visible'); loadNotes(viewY, viewM); };
+    document.getElementById('calMonth').onchange = function(){ viewM=+this.value; document.getElementById('notePanel').classList.remove('visible'); loadNotes(viewY, viewM); };
+
+    // ── Converter: BS → AD ──
+    function populateConvBS(){
+      const yEl = document.getElementById('c-bs-year');
+      yEl.innerHTML = Object.keys(CAL).sort((a,b)=>a-b)
+        .map(y=>`<option value="${y}"${+y===todayBS.year?' selected':''}>${y}</option>`).join('');
+      populateConvBSMonth();
+    }
+
+    function populateConvBSMonth(){
+      const mEl = document.getElementById('c-bs-month');
+      mEl.innerHTML = M_NP.map((n,i)=>`<option value="${i}"${i===todayBS.month?' selected':''}>${n} / ${M_EN[i]}</option>`).join('');
+      populateConvBSDay();
+    }
+
+    function populateConvBSDay(){
+      const y = +document.getElementById('c-bs-year').value;
+      const m = +document.getElementById('c-bs-month').value;
+      const cur = +document.getElementById('c-bs-day').value || todayBS.day;
+      const dim = md(y,m);
+      const dEl = document.getElementById('c-bs-day');
+      dEl.innerHTML = '';
+      for(let d=1;d<=dim;d++){
+        const o=document.createElement('option');
+        o.value=d; o.textContent=d+' ('+toNp(d)+')';
+        dEl.appendChild(o);
+      }
+      dEl.value = Math.min(cur,dim);
+      convertBS2AD();
+    }
+
+    function convertBS2AD(){
+      const y=+document.getElementById('c-bs-year').value;
+      const m=+document.getElementById('c-bs-month').value; // 0-indexed
+      const d=+document.getElementById('c-bs-day').value;
+      if(!y||isNaN(m)||!d) return;
+      // Use server-side Oracle formula (month is 1-indexed for API)
+      fetch(`/api/bstoad?year=${y}&month=${m+1}&day=${d}`)
+        .then(r=>r.json())
+        .then(data=>{
+          if(data.error){ document.getElementById('res-bs2ad').innerHTML=`<div class="r-empty">${data.error}</div>`; return; }
+          const dow=data.dayOfWeek;
+          const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dow];
+          const dnNp=['आइतबार','सोमबार','मंगलबार','बुधबार','बिहीबार','शुक्रबार','शनिबार'][dow];
+          const ad=new Date(data.date+'T00:00:00');
+          document.getElementById('res-bs2ad').innerHTML=`
+            <div class="r-main">${data.date}</div>
+            <div class="r-sub">${ad.toLocaleDateString('en-US',{day:'numeric',month:'long',year:'numeric'})}</div>
+            <div class="r-sub">${dnNp} / ${dn}</div>`;
+        })
+        .catch(()=>{ document.getElementById('res-bs2ad').innerHTML='<div class="r-empty">Conversion error</div>'; });
+    }
+
+    document.getElementById('c-bs-year').onchange  = populateConvBSMonth;
+    document.getElementById('c-bs-month').onchange = populateConvBSDay;
+    document.getElementById('c-bs-day').onchange   = convertBS2AD;
+
+    document.getElementById('btn-bs-today').onclick = ()=>{
+      document.getElementById('c-bs-year').value  = todayBS.year;
+      populateConvBSMonth();
+      document.getElementById('c-bs-month').value = todayBS.month;
+      populateConvBSDay();
+      document.getElementById('c-bs-day').value   = todayBS.day;
+      convertBS2AD();
+    };
+
+    // ── Converter: AD → BS ──
+    function convertAD2BS(){
+      const v = document.getElementById('c-ad-input').value;
+      if(!v) return;
+      fetch(`/api/adtobs?date=${v}`)
+        .then(r=>r.json())
+        .then(data=>{
+          if(data.error){ document.getElementById('res-ad2bs').innerHTML=`<div class="r-empty">${data.error}</div>`; return; }
+          const ad=new Date(v+'T00:00:00');
+          const dow=ad.getDay();
+          const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dow];
+          const dnNp=['आइतबार','सोमबार','मंगलबार','बुधबार','बिहीबार','शुक्रबार','शनिबार'][dow];
+          const mi=data.month-1;
+          document.getElementById('res-ad2bs').innerHTML=`
+            <div class="r-main">${toNp(data.day)} ${M_NP[mi]} ${toNp(data.year)}</div>
+            <div class="r-sub">${data.day} ${M_EN[mi]} ${data.year} BS</div>
+            <div class="r-sub">${dnNp} / ${dn}</div>`;
+        })
+        .catch(()=>{ document.getElementById('res-ad2bs').innerHTML='<div class="r-empty">Conversion error</div>'; });
+    }
+
+    document.getElementById('c-ad-input').oninput  = convertAD2BS;
+    document.getElementById('c-ad-input').onchange = convertAD2BS;
+
+    document.getElementById('btn-ad-today').onclick = ()=>{
+      document.getElementById('c-ad-input').value = fmtAD(todayAD);
+      convertAD2BS();
+    };
+
+    // ── Init ──
+    document.addEventListener('DOMContentLoaded', ()=>{
+      refreshAll();
+      // Converter defaults to today
+      populateConvBS();
+      document.getElementById('c-bs-day').value = todayBS.day;
+      convertBS2AD();
+      document.getElementById('c-ad-input').value = fmtAD(todayAD);
+      convertAD2BS();
+    });
+
+  })();
+  </script>
+</body>
+</html>

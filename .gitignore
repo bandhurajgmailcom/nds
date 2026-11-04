@@ -1,0 +1,8 @@
+node_modules
+db/dairy.db
+.env.local
+.env
+.claude/
+.vercel
+server.log
+server_err.log

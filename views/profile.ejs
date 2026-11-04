@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile - <%= companyName %></title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .pw-row td { background: #f5f6ff; padding: 10px 14px; }
+    .pw-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pw-form input { padding: 7px 10px; border: 1px solid #c5cae9; border-radius: 6px; font-size: 13px; width: 200px; }
+    .pw-form input:focus { outline: none; border-color: #3f51b5; }
+    .pw-label { font-size: 13px; color: #555; font-weight: 600; }
+    .btn-pw { background: #3f51b5; color: #fff; border: none; padding: 7px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .btn-pw:hover { background: #303f9f; }
+    .btn-pw-toggle { background: none; border: 1px solid #9fa8da; color: #3f51b5; padding: 4px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+    .btn-pw-toggle:hover { background: #e8eaf6; }
+    .action-cell { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <%- include('./partials/navbar') %>
+  <main class="main-content">
+    <div class="page-header"><h2>👤 My Profile</h2></div>
+
+    <% if (success) { %>
+      <div class="alert alert-success"><%= success %></div>
+    <% } %>
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+
+    <!-- User List -->
+    <div class="card">
+      <h3>My Account</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>#</th><th>Username</th><th>Role</th><th>Created</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td><strong><%= user.username %></strong> <span class="text-muted">(you)</span></td>
+              <td><span class="role-badge role-<%= user.role.toLowerCase() %>"><%= user.role %></span></td>
+              <td><%= user.created_at ? new Date(user.created_at).toISOString().split('T')[0] : '-' %></td>
+              <td>
+                <div class="action-cell">
+                  <button class="btn-pw-toggle" onclick="togglePw(<%= user.id %>)">🔑 Change Password</button>
+                </div>
+              </td>
+            </tr>
+            <!-- Inline password change row -->
+            <tr class="pw-row" id="pw-<%= user.id %>" style="display:none">
+              <td colspan="5">
+                <form method="POST" action="/profile/change-password" class="pw-form">
+                  <span class="pw-label">New password for <em><%= user.username %></em>:</span>
+                  <input type="password" name="new_password" placeholder="New password" minlength="4" required>
+                  <button type="submit" class="btn-pw">Set Password</button>
+                  <button type="button" class="btn-pw-toggle" onclick="togglePw(<%= user.id %>)">Cancel</button>
+                </form>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  <script src="/nepali-calendar.js"></script>
+  <script>
+    function togglePw(id) {
+      const row = document.getElementById('pw-' + id);
+      const visible = row.style.display !== 'none';
+      document.querySelectorAll('.pw-row').forEach(r => r.style.display = 'none');
+      if (!visible) {
+        row.style.display = '';
+        row.querySelector('input[type=password]').focus();
+      }
+    }
+  </script>
+</body>
+</html>

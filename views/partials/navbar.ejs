@@ -1,0 +1,62 @@
+<nav class="navbar">
+  <div class="nav-brand">
+    <img src="/logo.png" alt="Nepal Dairy NDS" style="height:36px;width:auto;object-fit:contain;">
+    <div id="nepaliDate" style="font-size:11px;color:#ffcdd2;margin-top:2px;"></div>
+  </div>
+  <div class="nav-links">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/pricelist">Pricelist</a>
+    <% if (user.role === 'Administrator') { %>
+      <div class="nav-dropdown">
+        <a href="/admin/products" class="nav-dropbtn" onclick="toggleNavDrop(event,'productsDrop')">Products ▾</a>
+        <div class="nav-dropmenu" id="productsDrop">
+          <a href="/admin/products">Products</a>
+          <a href="/admin/rawmaterials">Raw Materials</a>
+          <a href="/admin/recipes">Recipes</a>
+          <a href="/admin/recipe-summary">Recipe Summary</a>
+          <a href="/admin/recipe-detail">Recipe Detail</a>
+          <a href="/admin/raw-material-receipt">Raw Material Receipt</a>
+        </div>
+      </div>
+      <div class="nav-dropdown">
+        <a href="/admin/setup" class="nav-dropbtn" onclick="toggleNavDrop(event,'setupDrop')">Setup ▾</a>
+        <div class="nav-dropmenu" id="setupDrop">
+          <a href="/admin/setup">App Setup</a>
+          <a href="/admin/nepalical">Update Calendar</a>
+          <a href="/calendar">View Calendar</a>
+        </div>
+      </div>
+    <% } else { %>
+      <a href="/calendar">Calendar</a>
+    <% } %>
+    <a href="<%= user.role === 'Administrator' ? '/admin/users' : '/profile' %>">Users</a>
+  </div>
+  <div class="nav-user">
+    <span class="role-badge role-<%= user.role.toLowerCase() %>"><%= user.role %></span>
+    <a href="/profile" class="username" title="My Profile / Change Password"><%= user.username %></a>
+    <a href="/logout" class="btn-logout">Logout</a>
+  </div>
+  <button class="nav-hamburger" id="navHamburger" aria-label="Toggle menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<script>
+function toggleNavDrop(e, id) {
+  if (window.innerWidth > 768) return; // desktop uses hover
+  e.preventDefault();
+  var el = document.getElementById(id);
+  var isOpen = el.style.display === 'block';
+  // close all open drops first
+  document.querySelectorAll('.nav-dropmenu').forEach(function(m) { m.style.display = ''; });
+  el.style.display = isOpen ? '' : 'block';
+}
+document.getElementById('navHamburger').addEventListener('click', function() {
+  document.querySelector('.navbar').classList.toggle('nav-open');
+});
+// Close menu when a link is clicked
+document.querySelectorAll('.nav-links a, .nav-user a').forEach(function(link) {
+  link.addEventListener('click', function() {
+    document.querySelector('.navbar').classList.remove('nav-open');
+  });
+});
+</script>
